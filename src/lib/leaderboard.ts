@@ -1,21 +1,22 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getTopScores, upsertScore, initDb } from "@/lib/db";
+
+export type ScoreEntry = { rank: number; name: string; score: number };
 
 let dbReady = false;
 
 async function ensureDb() {
   if (!dbReady) {
+    const { initDb } = await import("@/lib/db");
     await initDb();
     dbReady = true;
   }
 }
 
-export type ScoreEntry = { rank: number; name: string; score: number };
-
 /** Server function: returns top-10 global scores */
 export const fetchGlobalScores = createServerFn({ method: "GET" }).handler(async () => {
   try {
     await ensureDb();
+    const { getTopScores } = await import("@/lib/db");
     const rows = await getTopScores();
     return { ok: true as const, scores: rows };
   } catch (err) {
@@ -43,6 +44,7 @@ export const submitScore = createServerFn({ method: "POST" })
 
     try {
       await ensureDb();
+      const { upsertScore } = await import("@/lib/db");
       await upsertScore(
         uuid.slice(0, 64),
         name.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 3) || "???",

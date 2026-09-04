@@ -8,9 +8,9 @@ import {
   type Theme,
 } from "@/components/AntGame";
 import { ensureAudio, isMuted, setMuted, sfx, startMusic, stopMusic } from "@/lib/sound";
-import { fetchGlobalScores, submitScore } from "@/server/leaderboard";
+import { fetchGlobalScores, submitScore } from "@/lib/leaderboard";
 import { getOrCreateUuid } from "@/lib/uuid";
-import type { ScoreEntry } from "@/server/leaderboard";
+import type { ScoreEntry } from "@/lib/leaderboard";
 
 export const Route = createFileRoute("/")({
   head: () => ({
