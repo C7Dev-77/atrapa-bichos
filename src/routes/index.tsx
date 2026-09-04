@@ -550,6 +550,10 @@ function Index() {
             >
               {state === "idle" ? "Jugar" : "Jugar otra vez"}
             </button>
+
+            <p className="mt-4 text-xs font-semibold tracking-wider text-muted-foreground">
+              Desarrollado con ❤️ por <span className="font-bold text-primary">C7Dev_</span>
+            </p>
           </div>
         </div>
       )}
