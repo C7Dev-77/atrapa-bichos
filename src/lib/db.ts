@@ -19,9 +19,20 @@ let _client: SqlClient | null | "pending" = "pending";
 async function getClient(): Promise<SqlClient | null> {
   if (_client !== "pending") return _client;
 
-  if (!process.env["POSTGRES_URL"]) {
+  const conn =
+    process.env["POSTGRES_URL"] ||
+    process.env["DATABASE_URL"] ||
+    process.env["STORAGE_URL"] ||
+    process.env["POSTGRES_URL_NON_POOLING"];
+
+  if (!conn) {
     _client = null;
     return null;
+  }
+
+  // Ensure @vercel/postgres finds the URL even if named differently by Vercel prefix
+  if (!process.env["POSTGRES_URL"]) {
+    process.env["POSTGRES_URL"] = conn;
   }
 
   try {
