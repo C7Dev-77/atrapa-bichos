@@ -517,80 +517,99 @@ function Index() {
         </div>
       )}
 
-      {/* ─── MODAL DEL ANUNCIO ATRACTIVO: GANA $10 USD POR CADA 1,000 PUNTOS ─── */}
+      {/* ─── PANTALLA DE ANUNCIO AMPLIA EN TODA LA PANTALLA Y RESPONSIVE ─── */}
       {showAdModal && (
-        <div className="absolute inset-0 z-50 grid place-items-center overflow-y-auto bg-black/75 p-4 sm:p-6 backdrop-blur-md animate-enter">
-          <div className="relative w-full max-w-md overflow-hidden rounded-[2.5rem] bg-gradient-to-b from-amber-950/80 via-card to-card p-6 sm:p-8 text-center shadow-2xl border-2 border-amber-400/50">
-            {/* Botón de cerrar (X) */}
-            <button
-              id="btn-close-ad"
-              onClick={() => {
-                setShowAdModal(false);
-                if (state === "idle") start();
-              }}
-              className="absolute top-4 right-4 h-9 w-9 rounded-full bg-background/80 text-foreground font-bold hover:bg-background flex items-center justify-center border border-border"
-              aria-label="Cerrar anuncio"
-            >
-              ✕
-            </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/90 p-3 sm:p-6 md:p-8 backdrop-blur-xl animate-enter overflow-y-auto">
+          {/* Fondo con resplandores dorados ambientales */}
+          <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+            <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-amber-500/20 blur-3xl animate-pulse" />
+            <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-yellow-400/20 blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
+          </div>
 
-            {/* Badge publicitario oficial */}
-            <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/20 px-4 py-1 text-xs font-extrabold uppercase tracking-widest text-amber-400 border border-amber-400/30">
-              💰 DESAFÍO OFICIAL C7Dev_
+          <div className="relative flex min-h-[85vh] sm:min-h-[88vh] w-full max-w-5xl flex-col justify-between overflow-hidden rounded-[2rem] sm:rounded-[3rem] border-2 border-amber-400/60 bg-gradient-to-b from-zinc-900/95 via-card/95 to-zinc-950/95 p-5 sm:p-8 md:p-10 shadow-[0_0_60px_rgba(245,158,11,0.25)]">
+            {/* Cabecera superior con badge y botón cerrar */}
+            <div className="flex items-center justify-between border-b border-border/40 pb-3 sm:pb-4">
+              <div className="inline-flex items-center gap-2 rounded-full bg-amber-400/15 px-3.5 py-1 sm:px-4 sm:py-1.5 text-xs sm:text-sm font-extrabold uppercase tracking-widest text-amber-400 border border-amber-400/30 shadow-sm">
+                <span>💰</span> DESAFÍO OFICIAL C7Dev_
+              </div>
+
+              <button
+                id="btn-close-ad"
+                onClick={() => {
+                  setShowAdModal(false);
+                  if (state === "idle") start();
+                }}
+                className="flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-full bg-card border border-border text-foreground font-bold shadow-toy transition-transform active:scale-90 hover:bg-accent hover:border-amber-400 cursor-pointer"
+                aria-label="Cerrar anuncio"
+                title="Cerrar y jugar"
+              >
+                ✕
+              </button>
             </div>
 
-            {/* Título de alto impacto */}
-            <div className="mt-4 flex justify-center text-5xl sm:text-6xl animate-bounce">
-              💵 🏆 💸
+            {/* Contenido principal amplio */}
+            <div className="my-auto py-4 sm:py-6 text-center flex flex-col items-center">
+              {/* Iconos animados */}
+              <div className="flex items-center justify-center gap-3 sm:gap-4 text-4xl sm:text-6xl md:text-7xl animate-bounce">
+                <span>💵</span>
+                <span>🏆</span>
+                <span>💸</span>
+              </div>
+
+              <h2 className="mt-3 sm:mt-4 font-display text-2xl sm:text-4xl md:text-5xl lg:text-6xl text-amber-400 leading-tight drop-shadow-[0_4px_16px_rgba(245,158,11,0.4)] max-w-4xl">
+                ¡GANA $10 USD POR CADA 1,000 PUNTOS!
+              </h2>
+
+              <p className="mt-2 sm:mt-3 max-w-2xl text-xs sm:text-base md:text-lg text-foreground/90 font-medium leading-relaxed">
+                Supera los 10 niveles antes de que el tiempo se agote, caza los insectos más veloces y acumula 1,000 puntos para ganar <strong>$10 dólares en efectivo</strong> transferidos al instante.
+              </p>
+
+              {/* Grid amplio de 4 columnas en desktop / 2 en tablet y móvil */}
+              <div className="mt-5 sm:mt-8 grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 text-left">
+                <div className="rounded-2xl bg-muted/70 p-3.5 sm:p-4 border border-amber-400/25 shadow-toy">
+                  <span className="text-xl sm:text-2xl">⏱️</span>
+                  <p className="mt-1 font-bold text-amber-400 text-xs sm:text-base">Tiempo Decreciente</p>
+                  <p className="text-muted-foreground text-[11px] sm:text-xs mt-0.5">L1: 45s • L2: 43s ... L10: ¡25s!</p>
+                </div>
+                <div className="rounded-2xl bg-muted/70 p-3.5 sm:p-4 border border-amber-400/25 shadow-toy">
+                  <span className="text-xl sm:text-2xl">🦗</span>
+                  <p className="mt-1 font-bold text-amber-400 text-xs sm:text-base">Menos Insectos</p>
+                  <p className="text-muted-foreground text-[11px] sm:text-xs mt-0.5">Las especies lentas desaparecen al subir</p>
+                </div>
+                <div className="rounded-2xl bg-muted/70 p-3.5 sm:p-4 border border-amber-400/25 shadow-toy">
+                  <span className="text-xl sm:text-2xl">⚡</span>
+                  <p className="mt-1 font-bold text-amber-400 text-xs sm:text-base">Nivel 10 Épico</p>
+                  <p className="text-muted-foreground text-[11px] sm:text-xs mt-0.5">Solo 9 bichos de las 3 razas más veloces</p>
+                </div>
+                <div className="rounded-2xl bg-muted/70 p-3.5 sm:p-4 border border-amber-400/25 shadow-toy">
+                  <span className="text-xl sm:text-2xl">💸</span>
+                  <p className="mt-1 font-bold text-amber-400 text-xs sm:text-base">Puntuación Máxima</p>
+                  <p className="text-muted-foreground text-[11px] sm:text-xs mt-0.5">¡Avanza hasta 999 puntos y reclama!</p>
+                </div>
+              </div>
+
+              <p className="mt-3 sm:mt-4 text-[10px] sm:text-xs text-muted-foreground italic">
+                * Promoción oficial para todos los jugadores. Sujeto a disponibilidad de insectos en el nivel 10.
+              </p>
             </div>
-            <h2 className="mt-3 font-display text-3xl sm:text-4xl text-amber-400 leading-tight drop-shadow-md">
-              ¡GANA $10 USD POR CADA 1,000 PUNTOS!
-            </h2>
 
-            <p className="mt-2 text-sm sm:text-base text-foreground font-medium leading-relaxed">
-              Supera los 10 niveles y acumula 1,000 puntos para ganar <strong>$10 dólares en efectivo</strong> transferidos al instante.
-            </p>
-
-            {/* Detalles del desafío con las nuevas reglas */}
-            <div className="mt-4 grid grid-cols-2 gap-2 text-left text-xs sm:text-sm">
-              <div className="rounded-2xl bg-muted/80 p-3 border border-border/60">
-                <p className="font-bold text-amber-400">⏱️ Tiempo Decreciente</p>
-                <p className="text-muted-foreground text-xs mt-0.5">L1: 45s • L2: 43s ... L10: 25s</p>
-              </div>
-              <div className="rounded-2xl bg-muted/80 p-3 border border-border/60">
-                <p className="font-bold text-amber-400">🦗 Menos Insectos</p>
-                <p className="text-muted-foreground text-xs mt-0.5">Las especies lentas desaparecen</p>
-              </div>
-              <div className="rounded-2xl bg-muted/80 p-3 border border-border/60">
-                <p className="font-bold text-amber-400">⚡ Nivel 10 Épico</p>
-                <p className="text-muted-foreground text-xs mt-0.5">Solo 9 bichos de las 3 razas top</p>
-              </div>
-              <div className="rounded-2xl bg-muted/80 p-3 border border-border/60">
-                <p className="font-bold text-amber-400">💸 Puntuación Máxima</p>
-                <p className="text-muted-foreground text-xs mt-0.5">¡Llega hasta 999 pts!</p>
-              </div>
+            {/* Botón CTA inferior grande y expansivo */}
+            <div className="pt-3 sm:pt-4 border-t border-border/40">
+              <button
+                id="btn-accept-ad"
+                onClick={() => {
+                  setShowAdModal(false);
+                  start();
+                }}
+                className="w-full rounded-full bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 py-3.5 sm:py-5 px-6 font-display text-lg sm:text-2xl md:text-3xl text-zinc-950 font-black shadow-[0_0_30px_rgba(245,158,11,0.5)] transition-all hover:scale-[1.01] hover:brightness-110 active:scale-95 flex items-center justify-center gap-3 cursor-pointer"
+              >
+                {adCountdown > 0 ? (
+                  <>⏳ Comenzar Desafío ({adCountdown}s)...</>
+                ) : (
+                  <>🚀 ¡ACEPTAR DESAFÍO Y GANAR $10 USD!</>
+                )}
+              </button>
             </div>
-
-            {/* Letra pequeña de la broma */}
-            <p className="mt-3 text-[11px] text-muted-foreground/80 italic">
-              * Promoción válida para todos los jugadores. Sujeto a disponibilidad del cajero al alcanzar 1,000 pts.
-            </p>
-
-            {/* Botón CTA con cuenta atrás */}
-            <button
-              id="btn-accept-ad"
-              onClick={() => {
-                setShowAdModal(false);
-                start();
-              }}
-              className="mt-5 w-full rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 px-6 py-4 font-display text-xl text-zinc-950 font-bold shadow-toy transition-transform active:scale-95 hover:brightness-110 flex items-center justify-center gap-2 cursor-pointer"
-            >
-              {adCountdown > 0 ? (
-                <>⏳ Comenzar Desafío ({adCountdown}s)...</>
-              ) : (
-                <>🚀 ¡ACEPTAR DESAFÍO Y GANAR $10 USD!</>
-              )}
-            </button>
           </div>
         </div>
       )}
