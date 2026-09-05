@@ -15,17 +15,17 @@ import type { ScoreEntry } from "@/lib/leaderboard";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Atrapa Bichos — Juego para niños" },
+      { title: "Atrapa Bichos — Desafío 10 Niveles por C7Dev_" },
       {
         name: "description",
         content:
-          "Juego web gratis para niños: toca los bichitos que corren por la pantalla, sube de nivel, atrapa al jefe, desbloquea logros y bate tu récord.",
+          "Juego web arcade de reflejos: supera los 10 niveles, atrapa insectos cada vez más veloces y compite por el récord de 1000 puntos creado por C7Dev_.",
       },
-      { property: "og:title", content: "Atrapa Bichos — Juego para niños" },
+      { property: "og:title", content: "Atrapa Bichos — Desafío 10 Niveles por C7Dev_" },
       {
         property: "og:description",
         content:
-          "Toca los bichitos, sube de nivel, atrapa al jefe, consigue logros y bate tu récord. Divertido y sin sustos.",
+          "Toca los bichos, esquiva bombas, supera 10 niveles y reclama tu récord. ¿Podrás alcanzar los 1000 puntos?",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -34,17 +34,46 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const EMPTY_STATS: GameStats = { caught: 0, missed: 0, maxCombo: 0, bosses: 0, gold: 0 };
+const EMPTY_STATS: GameStats = { caught: 0, missed: 0, maxCombo: 0, bosses: 0, gold: 0, dodges: 0 };
 
-// 5 themes — one per level group
-const THEMES: Theme[] = ["prado", "playa", "noche", "artico", "volcan"];
+// 10 escenas temáticas para los 10 niveles
+const THEMES: Theme[] = [
+  "prado",
+  "jardin",
+  "desierto",
+  "playa",
+  "bosque",
+  "pantano",
+  "noche",
+  "artico",
+  "volcan",
+  "cyber",
+];
+
+const THEME_NAMES: Record<Theme, string> = {
+  prado: "Prado Verde",
+  jardin: "Jardín Floral",
+  desierto: "Desierto Dorado",
+  playa: "Playa Tropical",
+  bosque: "Bosque Encantado",
+  pantano: "Pantano Místico",
+  noche: "Noche Estrellada",
+  artico: "Tundra Ártica",
+  volcan: "Volcán Ardiente",
+  cyber: "Dimensión Imposible ⚡",
+};
 
 const THEME_ICONS: Record<Theme, string> = {
   prado: "🌿",
+  jardin: "🌸",
+  desierto: "🏜️",
   playa: "🏖️",
+  bosque: "🌲",
+  pantano: "🍄",
   noche: "🌙",
   artico: "❄️",
   volcan: "🌋",
+  cyber: "⚡",
 };
 
 const MISSION_TARGET = 30;
@@ -64,14 +93,14 @@ const ACHIEVEMENTS: Achievement[] = [
   { id: "first", icon: "🐛", name: "Primer bichito", desc: "Atrapa tu primer bicho", test: ({ stats }) => stats.caught >= 1 },
   { id: "combo5", icon: "🔥", name: "Combo x5", desc: "Consigue un combo de 5", test: ({ stats, combo }) => stats.maxCombo >= 5 || combo >= 5 },
   { id: "combo10", icon: "⚡", name: "Combo x10", desc: "Consigue un combo de 10", test: ({ stats, combo }) => stats.maxCombo >= 10 || combo >= 10 },
-  { id: "score100", icon: "💯", name: "Cien puntos", desc: "Consigue 100 puntos en una partida", test: ({ score }) => score >= 100 },
-  { id: "score300", icon: "🌟", name: "Trescientos puntos", desc: "Consigue 300 puntos en una partida", test: ({ score }) => score >= 300 },
+  { id: "score100", icon: "💯", name: "Cien puntos", desc: "Supera el Nivel 1 (100 puntos)", test: ({ score }) => score >= 100 },
+  { id: "score300", icon: "🌟", name: "Nivel 4 Alcanzado", desc: "Consigue 300 puntos en una partida", test: ({ score }) => score >= 300 },
   { id: "gold", icon: "✨", name: "Bicho dorado", desc: "Atrapa un bicho dorado", test: ({ stats }) => stats.gold >= 1 },
   { id: "boss", icon: "👑", name: "Cazador de jefes", desc: "Atrapa a un bicho jefe", test: ({ stats }) => stats.bosses >= 1 },
   { id: "sharp", icon: "🎯", name: "Puntería experta", desc: "90% de precisión con 10+ toques", test: ({ stats, accuracy }) => accuracy >= 90 && stats.caught + stats.missed >= 10 },
-  { id: "level5", icon: "🚀", name: "Nivel 5", desc: "Llega al nivel 5", test: ({ level }) => level >= 5 },
-  { id: "butterfly", icon: "🦋", name: "Mariposa atrapada", desc: "Atrapa una mariposa (¡es muy rápida!)", test: ({ stats }) => (stats as GameStats & { butterflies?: number }).butterflies != null && (stats as GameStats & { butterflies?: number }).butterflies! >= 1 },
-  { id: "beetle", icon: "🪲", name: "Escarabajo raro", desc: "Atrapa un escarabajo (aparece poco)", test: ({ stats }) => (stats as GameStats & { beetles?: number }).beetles != null && (stats as GameStats & { beetles?: number }).beetles! >= 1 },
+  { id: "level5", icon: "🚀", name: "Mitad de camino", desc: "Llega al nivel 5 (Bosque Encantado)", test: ({ level }) => level >= 5 },
+  { id: "level10", icon: "⚡", name: "Dimensión Imposible", desc: "Llega al nivel 10 (900+ puntos)", test: ({ level }) => level >= 10 },
+  { id: "near1000", icon: "💸", name: "A un pelo de los $10", desc: "Llega a 900+ puntos (a punto de ganar $10 USD)", test: ({ score }) => score >= 900 },
 ];
 
 function missionKey() {
@@ -87,7 +116,7 @@ function Confetti() {
     dur: 2.5 + (i % 5) * 0.4,
   }));
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+    <div className="pointer-events-none absolute inset-0 overflow-hidden z-30" aria-hidden>
       {pieces.map((p, i) => (
         <span
           key={i}
@@ -165,17 +194,22 @@ function Index() {
   const toastId = useRef(0);
   const globalBoard = useGlobalBoard();
 
-  const level = state === "playing" ? Math.min(9, Math.floor((GAME_SECONDS - timeLeft) / 15) + 1) : 1;
-  const theme: Theme = THEMES[(level - 1) % THEMES.length] ?? "prado";
-  const prevLevelRef = useRef(level);
+  // Modal del anuncio publicitario de los $10 USD
+  const [showAdModal, setShowAdModal] = useState(false);
+  const [adCountdown, setAdCountdown] = useState(3);
+
+  // 10 Niveles basados en puntuación (cada 100 puntos sube de nivel)
+  const level = state === "playing" || state === "over" ? Math.min(10, Math.floor(score / 100) + 1) : 1;
+  const theme: Theme = THEMES[level - 1] ?? "prado";
+  const prevLevelRef = useRef(1);
 
   const pushToast = useCallback((text: string) => {
     const id = ++toastId.current;
     setToasts((t) => [...t, { id, text }]);
-    window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 2600);
+    window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 2800);
   }, []);
 
-  // carga inicial de localStorage
+  // Carga inicial
   useEffect(() => {
     const stored = Number(localStorage.getItem("atrapa-bichos-best") ?? 0);
     if (stored) setBest(stored);
@@ -189,22 +223,42 @@ function Index() {
     setMissionCount(mc);
     setMissionDone(mc >= MISSION_TARGET);
     setMutedState(isMuted());
+
+    // Mostrar el anuncio llamativo de los $10 USD al abrir la app
+    setShowAdModal(true);
+    setAdCountdown(3);
+    sfx.cash();
   }, []);
 
-  // aviso de nivel
+  // Cuenta atrás del anuncio publicitario
+  useEffect(() => {
+    if (!showAdModal || adCountdown <= 0) return;
+    const timer = window.setInterval(() => {
+      setAdCountdown((c) => Math.max(0, c - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [showAdModal, adCountdown]);
+
+  // REGLA: Cada nivel tiene 45 segundos para superar mientras obtienes los puntos
+  // Cuando subes de nivel (cada 100 puntos), el temporizador se reinicia a 45 segundos
   useEffect(() => {
     if (state === "playing" && level > prevLevelRef.current) {
-      pushToast(`🚀 ¡Nivel ${level}! ${THEME_ICONS[theme]}`);
+      setTimeLeft(GAME_SECONDS);
+      pushToast(`🚀 ¡NIVEL ${level}! ${THEME_ICONS[theme]} ${THEME_NAMES[theme]} (+45s)`);
       sfx.levelUp();
+      setConfetti(true);
+      window.setTimeout(() => setConfetti(false), 2400);
     }
     prevLevelRef.current = level;
   }, [level, state, pushToast, theme]);
 
-  // logros de combo en vivo
+  // Logros en vivo
   useEffect(() => {
-    if (state !== "playing" || combo < 5) return;
+    if (state !== "playing") return;
     const hit = ACHIEVEMENTS.filter(
-      (a) => (a.id === "combo5" || a.id === "combo10") && !unlocked.includes(a.id) && a.test({ stats: liveStats, score, accuracy: 0, combo, level }),
+      (a) =>
+        !unlocked.includes(a.id) &&
+        a.test({ stats: liveStats, score, accuracy: 0, combo, level }),
     );
     if (hit.length) {
       const next = [...unlocked, ...hit.map((a) => a.id)];
@@ -215,7 +269,7 @@ function Index() {
     }
   }, [combo, state, unlocked, liveStats, score, level, pushToast]);
 
-  // fin de partida
+  // Fin de partida
   useEffect(() => {
     if (state !== "over") return;
     stopMusic();
@@ -234,7 +288,7 @@ function Index() {
       sfx.gameOver();
     }
 
-    // misión diaria
+    // Misión diaria
     const newCount = missionCount + stats.caught;
     setMissionCount(newCount);
     localStorage.setItem(missionKey(), String(newCount));
@@ -245,7 +299,7 @@ function Index() {
       setConfetti(true);
     }
 
-    // logros
+    // Logros finales
     const hit = ACHIEVEMENTS.filter(
       (a) => !unlocked.includes(a.id) && a.test({ stats, score, accuracy, combo: 0, level }),
     );
@@ -275,7 +329,13 @@ function Index() {
     startMusic();
   };
 
-  const onScore = useCallback((n: number) => setScore((s) => Math.max(0, s + n)), []);
+  const handleStartWithAd = () => {
+    setShowAdModal(true);
+    setAdCountdown(3);
+    sfx.cash();
+  };
+
+  const onScore = useCallback((n: number) => setScore((s) => Math.min(999, Math.max(0, s + n))), []);
   const onTick = useCallback((d: number) => setTimeLeft((t) => Math.max(0, t + d)), []);
   const onComboChange = useCallback((c: number) => setCombo(c), []);
   const onStats = useCallback((s: GameStats) => setStats(s), []);
@@ -305,7 +365,6 @@ function Index() {
     setBoard(next);
     localStorage.setItem("ab-board", JSON.stringify(next));
     setBoardSaved(true);
-    // also send to global leaderboard (fire and forget)
     await postScore(name, score);
   };
 
@@ -313,6 +372,28 @@ function Index() {
     setBoardTab(tab);
     setShowBoard(true);
     if (tab === "global") globalBoard.fetch();
+  };
+
+  // Compartir en Redes Sociales
+  const shareText =
+    score >= 900
+      ? `¡Casi gano los $10 USD! Hice ${score} puntos en Atrapa Bichos de @C7Dev-77 y estuve a solo ${Math.max(1, 1000 - score)} punto de cobrar 😱💸 ¿Podrás superarme?`
+      : `¡Hice ${score} puntos en Atrapa Bichos de @C7Dev-77 y llegué al Nivel ${level} (${THEME_NAMES[theme]})! 🦟🎯 ¿Puedes superarme?`;
+
+  const shareOnTwitter = () => {
+    const url = typeof window !== "undefined" ? window.location.origin : "https://atrapa-bichos.vercel.app";
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`, "_blank");
+  };
+
+  const shareOnWhatsApp = () => {
+    const url = typeof window !== "undefined" ? window.location.origin : "https://atrapa-bichos.vercel.app";
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText + " Juega aquí: " + url)}`, "_blank");
+  };
+
+  const copyShareLink = () => {
+    const url = typeof window !== "undefined" ? window.location.origin : "https://atrapa-bichos.vercel.app";
+    void navigator.clipboard.writeText(`${shareText}\n${url}`);
+    pushToast("📋 ¡Copiado al portapapeles para compartir!");
   };
 
   const missionProgress = Math.min(100, Math.round((missionCount / MISSION_TARGET) * 100));
@@ -334,31 +415,37 @@ function Index() {
         theme={theme}
       />
 
-      {confetti && state === "over" && <Confetti />}
+      {confetti && <Confetti />}
 
-      {/* HUD */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-4 sm:p-6">
-        <div className="flex flex-col gap-2">
-          <div className="rounded-3xl bg-card/90 px-5 py-3 shadow-toy">
-            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Puntos</p>
-            <p className="font-display text-4xl leading-none text-primary">{score}</p>
+      {/* HUD SUPERIOR */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-3 sm:p-5 z-10">
+        <div className="flex flex-col gap-1.5 sm:gap-2">
+          {/* Puntuación */}
+          <div className="rounded-2xl sm:rounded-3xl bg-card/90 px-4 py-2 sm:px-5 sm:py-3 shadow-toy backdrop-blur-sm border border-border/50">
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-muted-foreground">Puntos</p>
+            <div className="flex items-baseline gap-1.5">
+              <p className="font-display text-3xl sm:text-4xl leading-none text-primary">{score}</p>
+              <span className="text-[11px] sm:text-xs font-bold text-muted-foreground">/ 1,000 pts</span>
+            </div>
           </div>
+
+          {/* Nivel y Escenario */}
           {state === "playing" && (
-            <div className="rounded-full bg-card/90 px-4 py-1.5 text-center shadow-toy">
-              <p className="text-sm font-bold text-foreground">
-                Nivel {level} {THEME_ICONS[theme]}
+            <div className="rounded-full bg-card/90 px-3 py-1 sm:px-4 sm:py-1.5 text-center shadow-toy backdrop-blur-sm border border-border/50">
+              <p className="text-xs sm:text-sm font-bold text-foreground">
+                Nivel {level}/10 • {THEME_ICONS[theme]} {THEME_NAMES[theme]}
               </p>
             </div>
           )}
         </div>
 
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex flex-col items-end gap-1.5 sm:gap-2">
           <div className="flex gap-2">
             <button
               id="btn-mute"
               onClick={toggleMute}
               aria-label={muted ? "Activar sonido" : "Silenciar"}
-              className="pointer-events-auto rounded-full bg-card/90 px-4 py-2 font-bold text-foreground shadow-toy transition-transform active:scale-95 hover:bg-card"
+              className="pointer-events-auto rounded-full bg-card/90 px-3 py-1.5 sm:px-4 sm:py-2 font-bold text-foreground shadow-toy transition-transform active:scale-95 hover:bg-card border border-border/50 text-sm sm:text-base"
             >
               {muted ? "🔇" : "🔊"}
             </button>
@@ -366,52 +453,56 @@ function Index() {
               <button
                 id="btn-pause"
                 onClick={() => setPaused((p) => !p)}
-                className="pointer-events-auto rounded-full bg-card/90 px-4 py-2 font-bold text-foreground shadow-toy transition-transform active:scale-95 hover:bg-card"
+                className="pointer-events-auto rounded-full bg-card/90 px-3 py-1.5 sm:px-4 sm:py-2 font-bold text-foreground shadow-toy transition-transform active:scale-95 hover:bg-card border border-border/50 text-sm sm:text-base"
               >
-                {paused ? "▶ Continuar" : "⏸ Pausa"}
+                {paused ? "▶ Seguir" : "⏸ Pausa"}
               </button>
             )}
           </div>
-          <div className="rounded-3xl bg-card/90 px-5 py-3 text-right shadow-toy">
-            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Tiempo</p>
-            <p className="font-display text-4xl leading-none text-accent-foreground">{timeLeft}s</p>
+
+          {/* Temporizador de nivel (45s por nivel) */}
+          <div className={`rounded-2xl sm:rounded-3xl px-4 py-2 sm:px-5 sm:py-3 text-right shadow-toy backdrop-blur-sm border transition-colors ${timeLeft <= 10 ? "bg-destructive/90 text-destructive-foreground border-destructive animate-pulse" : "bg-card/90 border-border/50"}`}>
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest opacity-80">
+              Tiempo Nivel {level}
+            </p>
+            <p className="font-display text-3xl sm:text-4xl leading-none">{timeLeft}s</p>
           </div>
         </div>
       </div>
 
-      {/* Toasts */}
-      <div className="pointer-events-none absolute top-28 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-2">
+      {/* Notificaciones Toasts */}
+      <div className="pointer-events-none absolute top-24 sm:top-28 left-1/2 z-30 flex -translate-x-1/2 flex-col items-center gap-2">
         {toasts.map((t) => (
-          <div key={t.id} className="rounded-full bg-primary px-5 py-2 shadow-toy animate-enter">
-            <p className="font-display text-lg text-primary-foreground">{t.text}</p>
+          <div key={t.id} className="rounded-full bg-primary px-5 py-2 shadow-toy animate-enter text-center border-2 border-primary-foreground/20">
+            <p className="font-display text-base sm:text-lg text-primary-foreground">{t.text}</p>
           </div>
         ))}
       </div>
 
-      {/* Combo banner */}
+      {/* Banner de Combo */}
       {state === "playing" && combo > 1 && (
-        <div className="pointer-events-none absolute top-24 left-1/2 -translate-x-1/2 rounded-full bg-primary px-5 py-2 shadow-toy animate-bounce">
-          <p className="font-display text-xl text-primary-foreground">Combo x{combo}</p>
+        <div className="pointer-events-none absolute top-20 sm:top-24 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-1.5 sm:px-5 sm:py-2 shadow-toy animate-bounce z-20">
+          <p className="font-display text-lg sm:text-xl text-primary-foreground">Combo x{combo} 🔥</p>
         </div>
       )}
 
-      {/* Pause overlay */}
+      {/* Pausa */}
       {state === "playing" && paused && (
-        <div className="absolute inset-0 grid place-items-center bg-foreground/40 p-6 backdrop-blur-md">
-          <div className="w-full max-w-sm rounded-[2rem] bg-card p-8 text-center shadow-toy">
+        <div className="absolute inset-0 z-40 grid place-items-center bg-foreground/40 p-6 backdrop-blur-md">
+          <div className="w-full max-w-sm rounded-[2rem] bg-card p-8 text-center shadow-toy border border-border">
             <p className="font-display text-5xl text-primary">Pausa</p>
-            <p className="mt-2 text-lg text-muted-foreground">Toma un respiro</p>
+            <p className="mt-2 text-base text-muted-foreground">Toma un respiro y prepárate</p>
             <button
               id="btn-resume"
               onClick={() => setPaused(false)}
-              className="mt-6 w-full rounded-full bg-primary px-8 py-4 font-display text-2xl text-primary-foreground shadow-toy transition-transform active:scale-95 hover:brightness-110"
+              className="mt-6 w-full rounded-full bg-primary px-8 py-3.5 font-display text-xl text-primary-foreground shadow-toy transition-transform active:scale-95 hover:brightness-110"
             >
-              ▶ Continuar
+              ▶ Continuar Partida
             </button>
             <button
               id="btn-exit-pause"
               onClick={() => setState("idle")}
-              className="mt-3 w-full rounded-full border-2 border-border bg-background px-8 py-3 font-display text-xl text-foreground transition-colors hover:bg-accent"
+              className="mt-3 w-full rounded-full border-2 border-border bg-background px-8 py-2.5 font-display text-lg text-foreground transition-colors hover:bg-accent"
             >
               Salir al menú
             </button>
@@ -419,43 +510,182 @@ function Index() {
         </div>
       )}
 
-      {/* Menú / fin de partida */}
-      {state !== "playing" && (
-        <div className="absolute inset-0 grid place-items-center overflow-y-auto bg-foreground/30 p-6 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-[2rem] bg-card p-8 text-center shadow-toy">
-            <h1 className="font-display text-4xl text-primary sm:text-5xl">
-              {state === "idle" ? "¡Atrapa Bichos!" : "¡Se acabó el tiempo!"}
-            </h1>
-            <p className="mt-4 text-lg text-muted-foreground">
-              {state === "idle"
-                ? "Toca los bichitos, sube de nivel y atrapa al jefe. ¡Cuidado con las bombas! 💣"
-                : `Atrapaste ${stats.caught} bichito${stats.caught === 1 ? "" : "s"} y llegaste al nivel ${level}.`}
+      {/* ─── MODAL DEL ANUNCIO ATRACTIVO: GANA $10 USD POR CADA 1,000 PUNTOS ─── */}
+      {showAdModal && (
+        <div className="absolute inset-0 z-50 grid place-items-center overflow-y-auto bg-black/75 p-4 sm:p-6 backdrop-blur-md animate-enter">
+          <div className="relative w-full max-w-md overflow-hidden rounded-[2.5rem] bg-gradient-to-b from-amber-950/80 via-card to-card p-6 sm:p-8 text-center shadow-2xl border-2 border-amber-400/50">
+            {/* Botón de cerrar (X) */}
+            <button
+              id="btn-close-ad"
+              onClick={() => {
+                setShowAdModal(false);
+                if (state === "idle") start();
+              }}
+              className="absolute top-4 right-4 h-9 w-9 rounded-full bg-background/80 text-foreground font-bold hover:bg-background flex items-center justify-center border border-border"
+              aria-label="Cerrar anuncio"
+            >
+              ✕
+            </button>
+
+            {/* Badge publicitario oficial */}
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/20 px-4 py-1 text-xs font-extrabold uppercase tracking-widest text-amber-400 border border-amber-400/30">
+              💰 PROMOCIÓN ESPECIAL DE C7Dev_
+            </div>
+
+            {/* Título de alto impacto */}
+            <div className="mt-4 flex justify-center text-5xl sm:text-6xl animate-bounce">
+              💵 🏆 💸
+            </div>
+            <h2 className="mt-3 font-display text-3xl sm:text-4xl text-amber-400 leading-tight drop-shadow-md">
+              ¡GANA $10 USD POR CADA 1,000 PUNTOS!
+            </h2>
+
+            <p className="mt-2 text-sm sm:text-base text-foreground font-medium leading-relaxed">
+              ¿Tienes la puntería y velocidad necesarias? Supera los 10 niveles antes de que acabe el tiempo de 45 segundos y acumula 1,000 puntos para ganar <strong>$10 dólares en efectivo</strong>.
             </p>
+
+            {/* Detalles del desafío */}
+            <div className="mt-4 grid grid-cols-2 gap-2 text-left text-xs sm:text-sm">
+              <div className="rounded-2xl bg-muted/80 p-3 border border-border/60">
+                <p className="font-bold text-amber-400">⚡ 10 Niveles</p>
+                <p className="text-muted-foreground text-xs mt-0.5">Insectos cada vez más rápidos</p>
+              </div>
+              <div className="rounded-2xl bg-muted/80 p-3 border border-border/60">
+                <p className="font-bold text-amber-400">⏱️ 45s por Nivel</p>
+                <p className="text-muted-foreground text-xs mt-0.5">El tiempo se reinicia al subir</p>
+              </div>
+              <div className="rounded-2xl bg-muted/80 p-3 border border-border/60">
+                <p className="font-bold text-amber-400">🦟 Nivel 10 Épico</p>
+                <p className="text-muted-foreground text-xs mt-0.5">Los mosquitos rompen el sonido</p>
+              </div>
+              <div className="rounded-2xl bg-muted/80 p-3 border border-border/60">
+                <p className="font-bold text-amber-400">💸 Pago Inmediato</p>
+                <p className="text-muted-foreground text-xs mt-0.5">¡Si logras los 1,000 puntos!</p>
+              </div>
+            </div>
+
+            {/* Letra pequeña de la broma */}
+            <p className="mt-3 text-[11px] text-muted-foreground/80 italic">
+              * Promoción válida para todos los jugadores. Sujeto a disponibilidad de insectos en el nivel 10.
+            </p>
+
+            {/* Botón CTA con cuenta atrás */}
+            <button
+              id="btn-accept-ad"
+              onClick={() => {
+                setShowAdModal(false);
+                start();
+              }}
+              className="mt-5 w-full rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 px-6 py-4 font-display text-xl text-zinc-950 font-bold shadow-toy transition-transform active:scale-95 hover:brightness-110 flex items-center justify-center gap-2"
+            >
+              {adCountdown > 0 ? (
+                <>⏳ Comenzar Desafío ({adCountdown}s)...</>
+              ) : (
+                <>🚀 ¡ACEPTAR DESAFÍO Y GANAR $10 USD!</>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MENÚ PRINCIPAL O PANTALLA DE FIN DE PARTIDA ─── */}
+      {state !== "playing" && (
+        <div className="absolute inset-0 z-30 grid place-items-center overflow-y-auto bg-foreground/35 p-4 sm:p-6 backdrop-blur-md">
+          <div className="w-full max-w-md rounded-[2.5rem] bg-card p-6 sm:p-8 text-center shadow-toy border border-border">
+            
+            {/* Banner llamativo para volver a ver la promo en menú */}
+            {state === "idle" && (
+              <button
+                onClick={handleStartWithAd}
+                className="mb-4 w-full rounded-2xl bg-gradient-to-r from-amber-500/20 via-yellow-400/25 to-amber-500/20 p-3 text-center border-2 border-amber-400/60 shadow-toy transition-transform hover:scale-[1.02] active:scale-95 cursor-pointer"
+              >
+                <p className="text-xs font-black uppercase tracking-wider text-amber-500">💰 DESAFÍO OFICIAL $10 USD</p>
+                <p className="font-display text-lg text-foreground">¡Consigue 1,000 puntos y cobra! 🔥</p>
+              </button>
+            )}
+
+            <h1 className="font-display text-3xl sm:text-5xl text-primary">
+              {state === "idle" ? "¡Atrapa Bichos!" : "¡Tiempo Agotado!"}
+            </h1>
+
+            {/* MENSAJE DE LA BROMA CUANDO TE QUEDAS A 1 PUNTO DE LOS $10 USD (900 - 999 pts) */}
+            {state === "over" && score >= 900 ? (
+              <div className="mt-3 rounded-2xl bg-amber-500/15 p-4 border-2 border-amber-400 text-left animate-enter">
+                <div className="flex items-center gap-2">
+                  <span className="text-3xl">😱💸</span>
+                  <div>
+                    <p className="font-display text-xl text-amber-400">
+                      {score === 999
+                        ? "¡¡A SOLO 1 PUNTO DE LOS $10 USD!!"
+                        : `¡¡A ${1000 - score} PUNTOS DE LOS $10 USD!!`}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Te quedaste en {score}/1,000 puntos</p>
+                  </div>
+                </div>
+                <p className="mt-2 text-xs sm:text-sm text-foreground leading-snug">
+                  Los mosquitos del Nivel 10 eran demasiado rápidos... y además el servidor de pagos de <strong>C7Dev_</strong> está temporalmente fuera de servicio por mantenimiento 😂 ¡Comparte tu récord y reta a tus amigos!
+                </p>
+              </div>
+            ) : (
+              <p className="mt-3 text-base sm:text-lg text-muted-foreground">
+                {state === "idle"
+                  ? "10 Niveles, 45 segundos por nivel. Toca los insectos según su velocidad y batiendo récords."
+                  : `Atrapaste ${stats.caught} bichos y alcanzaste el Nivel ${level} (${THEME_NAMES[theme]}).`}
+              </p>
+            )}
 
             {state === "over" && newBest && (
               <p className="mt-3 font-display text-2xl text-accent-foreground animate-bounce">
-                🎉 ¡Nuevo récord!
+                🎉 ¡Nuevo récord personal!
               </p>
             )}
 
             {state === "over" && (
-              <div className="mt-4 grid grid-cols-3 gap-3">
-                <div className="rounded-2xl bg-muted p-3">
-                  <p className="text-xs font-bold uppercase text-muted-foreground">Puntos</p>
-                  <p className="font-display text-2xl text-foreground">{score}</p>
+              <>
+                <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
+                  <div className="rounded-2xl bg-muted p-2.5 sm:p-3">
+                    <p className="text-[10px] sm:text-xs font-bold uppercase text-muted-foreground">Puntos</p>
+                    <p className="font-display text-2xl sm:text-3xl text-foreground">{score}</p>
+                  </div>
+                  <div className="rounded-2xl bg-muted p-2.5 sm:p-3">
+                    <p className="text-[10px] sm:text-xs font-bold uppercase text-muted-foreground">Nivel</p>
+                    <p className="font-display text-2xl sm:text-3xl text-primary">{level}/10</p>
+                  </div>
+                  <div className="rounded-2xl bg-muted p-2.5 sm:p-3">
+                    <p className="text-[10px] sm:text-xs font-bold uppercase text-muted-foreground">Precisión</p>
+                    <p className="font-display text-2xl sm:text-3xl text-foreground">{accuracy}%</p>
+                  </div>
                 </div>
-                <div className="rounded-2xl bg-muted p-3">
-                  <p className="text-xs font-bold uppercase text-muted-foreground">Combo máx.</p>
-                  <p className="font-display text-2xl text-foreground">x{stats.maxCombo}</p>
+
+                {/* BOTONES PARA COMPARTIR EN REDES SOCIALES */}
+                <div className="mt-4 rounded-2xl bg-muted/60 p-3.5 border border-border">
+                  <p className="text-xs font-bold text-foreground mb-2">📢 ¡Comparte tu puntuación máxima!</p>
+                  <div className="flex justify-center gap-2">
+                    <button
+                      onClick={shareOnWhatsApp}
+                      className="flex-1 rounded-full bg-[#25D366] px-3 py-2 text-xs font-bold text-white shadow-toy transition-transform active:scale-95 flex items-center justify-center gap-1"
+                    >
+                      💬 WhatsApp
+                    </button>
+                    <button
+                      onClick={shareOnTwitter}
+                      className="flex-1 rounded-full bg-zinc-900 px-3 py-2 text-xs font-bold text-white shadow-toy transition-transform active:scale-95 flex items-center justify-center gap-1 border border-zinc-700"
+                    >
+                      𝕏 Twitter
+                    </button>
+                    <button
+                      onClick={copyShareLink}
+                      className="rounded-full bg-primary/20 px-3 py-2 text-xs font-bold text-primary transition-transform active:scale-95 hover:bg-primary/30"
+                      title="Copiar texto y enlace"
+                    >
+                      📋 Copiar
+                    </button>
+                  </div>
                 </div>
-                <div className="rounded-2xl bg-muted p-3">
-                  <p className="text-xs font-bold uppercase text-muted-foreground">Precisión</p>
-                  <p className="font-display text-2xl text-foreground">{accuracy}%</p>
-                </div>
-              </div>
+              </>
             )}
 
-            {/* guardar en tabla de récords */}
+            {/* Guardar en tabla de récords */}
             {state === "over" && qualifies && !boardSaved && (
               <div className="mt-4 rounded-2xl bg-accent/60 p-4">
                 <p className="font-bold text-foreground">¡Entras en el Top 10! Escribe tus iniciales:</p>
@@ -479,18 +709,18 @@ function Index() {
               </div>
             )}
 
-            {/* misión diaria */}
+            {/* Misión diaria */}
             <div className="mt-4 rounded-2xl bg-muted p-3 text-left">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-bold text-foreground">
+                <p className="text-xs sm:text-sm font-bold text-foreground">
                   🎯 Misión diaria: atrapa {MISSION_TARGET} bichos
                 </p>
-                <p className="text-sm font-bold text-muted-foreground">
+                <p className="text-xs sm:text-sm font-bold text-muted-foreground">
                   {Math.min(missionCount, MISSION_TARGET)}/{MISSION_TARGET}
                   {missionDone && " ✅"}
                 </p>
               </div>
-              <div className="mt-2 h-3 overflow-hidden rounded-full bg-background">
+              <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-background">
                 <div
                   className="h-full rounded-full bg-primary transition-all"
                   style={{ width: `${missionProgress}%` }}
@@ -499,43 +729,47 @@ function Index() {
             </div>
 
             {best > 0 && (
-              <p className="mt-3 text-base font-bold text-secondary-foreground">Récord local: {best}</p>
+              <p className="mt-2 text-sm font-bold text-secondary-foreground">Récord personal: {best} pts</p>
             )}
 
             {state === "idle" && (
               <>
-                {/* leyenda de bichos */}
-                <div className="mt-4 flex flex-wrap justify-center gap-2 text-sm text-muted-foreground">
-                  <span className="rounded-full bg-muted px-3 py-1">⏰ +10s</span>
-                  <span className="rounded-full bg-muted px-3 py-1">❄️ Congela</span>
-                  <span className="rounded-full bg-muted px-3 py-1">⚡ x2 pts</span>
-                  <span className="rounded-full bg-muted px-3 py-1">✨ Dorado +10</span>
-                  <span className="rounded-full bg-muted px-3 py-1">💣 -5</span>
-                  <span className="rounded-full bg-muted px-3 py-1">👑 Jefe +25</span>
-                  <span className="rounded-full bg-muted px-3 py-1">🦋 +4</span>
-                  <span className="rounded-full bg-muted px-3 py-1">🕷 +6</span>
-                  <span className="rounded-full bg-muted px-3 py-1">🐝 +3</span>
-                  <span className="rounded-full bg-muted px-3 py-1">🪲 +8</span>
+                {/* Insectos por velocidad */}
+                <div className="mt-3 rounded-2xl bg-muted/60 p-3 text-left border border-border/50">
+                  <p className="text-xs font-bold text-foreground mb-1.5">🦗 Insectos ordenados por velocidad:</p>
+                  <div className="flex flex-wrap gap-1 text-[11px] text-muted-foreground">
+                    <span className="rounded-md bg-background px-2 py-0.5">1. Oruga 🐛 (lenta)</span>
+                    <span className="rounded-md bg-background px-2 py-0.5">2. Escarabajo 🪲</span>
+                    <span className="rounded-md bg-background px-2 py-0.5">3. Hormiga 🐜</span>
+                    <span className="rounded-md bg-background px-2 py-0.5">4. Mariquita 🐞</span>
+                    <span className="rounded-md bg-background px-2 py-0.5">5. Araña 🕷️</span>
+                    <span className="rounded-md bg-background px-2 py-0.5">6. Abeja 🐝</span>
+                    <span className="rounded-md bg-background px-2 py-0.5">7. Mariposa 🦋</span>
+                    <span className="rounded-md bg-background px-2 py-0.5">8. Mosca 🪰</span>
+                    <span className="rounded-md bg-background px-2 py-0.5">9. Avispa 🐝</span>
+                    <span className="rounded-md bg-amber-400/20 text-amber-500 font-bold px-2 py-0.5">10. Mosquito 🦟 (imposible)</span>
+                  </div>
                 </div>
+
                 <div className="mt-4 flex flex-wrap justify-center gap-2">
                   <button
                     id="btn-open-local-board"
                     onClick={() => openBoard("local")}
-                    className="rounded-full border-2 border-border bg-background px-4 py-2 font-bold text-foreground transition-colors hover:bg-accent"
+                    className="rounded-full border-2 border-border bg-background px-4 py-2 font-bold text-xs sm:text-sm text-foreground transition-colors hover:bg-accent"
                   >
                     🏅 Local
                   </button>
                   <button
                     id="btn-open-global-board"
                     onClick={() => openBoard("global")}
-                    className="rounded-full border-2 border-border bg-background px-4 py-2 font-bold text-foreground transition-colors hover:bg-accent"
+                    className="rounded-full border-2 border-border bg-background px-4 py-2 font-bold text-xs sm:text-sm text-foreground transition-colors hover:bg-accent"
                   >
                     🌍 Global
                   </button>
                   <button
                     id="btn-open-achievements"
                     onClick={() => setShowAchievements(true)}
-                    className="rounded-full border-2 border-border bg-background px-4 py-2 font-bold text-foreground transition-colors hover:bg-accent"
+                    className="rounded-full border-2 border-border bg-background px-4 py-2 font-bold text-xs sm:text-sm text-foreground transition-colors hover:bg-accent"
                   >
                     🏆 Logros {unlocked.length}/{ACHIEVEMENTS.length}
                   </button>
@@ -546,9 +780,9 @@ function Index() {
             <button
               id="btn-play"
               onClick={start}
-              className="mt-6 w-full rounded-full bg-primary px-8 py-4 font-display text-2xl text-primary-foreground shadow-toy transition-transform active:scale-95 hover:brightness-110"
+              className="mt-5 w-full rounded-full bg-primary px-8 py-4 font-display text-2xl text-primary-foreground shadow-toy transition-transform active:scale-95 hover:brightness-110"
             >
-              {state === "idle" ? "Jugar" : "Jugar otra vez"}
+              {state === "idle" ? "¡Jugar Ahora!" : "Intentar otra vez"}
             </button>
 
             <p className="mt-4 text-xs font-semibold tracking-wider text-muted-foreground">
@@ -558,11 +792,10 @@ function Index() {
         </div>
       )}
 
-      {/* Panel de récords (Local / Global) */}
+      {/* Panel de récords */}
       {showBoard && (
-        <div className="absolute inset-0 z-30 grid place-items-center bg-foreground/40 p-6 backdrop-blur-md">
-          <div className="w-full max-w-sm rounded-[2rem] bg-card p-6 shadow-toy">
-            {/* tabs */}
+        <div className="absolute inset-0 z-40 grid place-items-center bg-foreground/40 p-6 backdrop-blur-md">
+          <div className="w-full max-w-sm rounded-[2rem] bg-card p-6 shadow-toy border border-border">
             <div className="mb-4 flex overflow-hidden rounded-full border-2 border-border">
               <button
                 id="tab-local"
@@ -585,10 +818,10 @@ function Index() {
 
             {boardTab === "local" ? (
               <>
-                <h2 className="text-center font-display text-3xl text-primary">Top 10 Local</h2>
-                <ol className="mt-4 flex flex-col gap-2">
+                <h2 className="text-center font-display text-2xl sm:text-3xl text-primary">Top 10 Local</h2>
+                <ol className="mt-4 flex flex-col gap-2 max-h-60 overflow-y-auto">
                   {board.length === 0 && (
-                    <p className="text-center text-muted-foreground">Aún no hay récords. ¡Juega una partida!</p>
+                    <p className="text-center text-sm text-muted-foreground">Aún no hay récords. ¡Juega una partida!</p>
                   )}
                   {board.map((e, i) => (
                     <li key={i} className="flex items-center justify-between rounded-2xl bg-muted px-4 py-2">
@@ -600,18 +833,18 @@ function Index() {
               </>
             ) : (
               <>
-                <h2 className="text-center font-display text-3xl text-primary">Top 10 Mundial 🌍</h2>
+                <h2 className="text-center font-display text-2xl sm:text-3xl text-primary">Top 10 Mundial 🌍</h2>
                 {globalBoard.loading && (
                   <p className="mt-4 text-center text-muted-foreground animate-pulse">Cargando...</p>
                 )}
                 {!globalBoard.loading && !globalBoard.available && (
                   <div className="mt-4 rounded-2xl bg-muted p-4 text-center text-sm text-muted-foreground">
-                    <p>🔌 Leaderboard global no disponible en modo local.</p>
-                    <p className="mt-1 opacity-70">Estará activo tras desplegar en Vercel.</p>
+                    <p>🔌 Leaderboard global no disponible en local.</p>
+                    <p className="mt-1 opacity-70">Se activará tras el deploy en Vercel con Postgres.</p>
                   </div>
                 )}
                 {!globalBoard.loading && globalBoard.available && (
-                  <ol className="mt-4 flex flex-col gap-2">
+                  <ol className="mt-4 flex flex-col gap-2 max-h-60 overflow-y-auto">
                     {globalBoard.rows.length === 0 && (
                       <p className="text-center text-muted-foreground">¡Sé el primero en el ranking mundial!</p>
                     )}
@@ -641,9 +874,9 @@ function Index() {
 
       {/* Panel de logros */}
       {showAchievements && (
-        <div className="absolute inset-0 z-30 grid place-items-center bg-foreground/40 p-6 backdrop-blur-md">
-          <div className="max-h-[80vh] w-full max-w-sm overflow-y-auto rounded-[2rem] bg-card p-6 shadow-toy">
-            <h2 className="text-center font-display text-3xl text-primary">
+        <div className="absolute inset-0 z-40 grid place-items-center bg-foreground/40 p-6 backdrop-blur-md">
+          <div className="max-h-[80vh] w-full max-w-sm overflow-y-auto rounded-[2rem] bg-card p-6 shadow-toy border border-border">
+            <h2 className="text-center font-display text-2xl sm:text-3xl text-primary">
               🏆 Logros {unlocked.length}/{ACHIEVEMENTS.length}
             </h2>
             <ul className="mt-4 flex flex-col gap-2">
@@ -656,8 +889,8 @@ function Index() {
                   >
                     <span className="text-2xl">{got ? a.icon : "🔒"}</span>
                     <div>
-                      <p className="font-bold text-foreground">{a.name}</p>
-                      <p className="text-sm text-muted-foreground">{a.desc}</p>
+                      <p className="font-bold text-foreground text-sm">{a.name}</p>
+                      <p className="text-xs text-muted-foreground">{a.desc}</p>
                     </div>
                   </li>
                 );

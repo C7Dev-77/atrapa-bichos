@@ -86,6 +86,12 @@ export const sfx = {
     tone(880, 0.12, "sine", 0.14);
     tone(1175, 0.25, "sine", 0.14, 0.1);
   },
+  dodge: () => {
+    tone(700, 0.08, "sawtooth", 0.1, 0, 500);
+  },
+  cash: () => {
+    [987, 1318].forEach((f, i) => tone(f, 0.12, "sine", 0.12, i * 0.08));
+  },
 };
 
 // Música de fondo: bucle alegre con melodía y bajo.
