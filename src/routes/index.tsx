@@ -102,8 +102,8 @@ const ACHIEVEMENTS: Achievement[] = [
   { id: "sharp", icon: "🎯", name: "Puntería experta", desc: "90% de precisión con 10+ toques", test: ({ stats, accuracy }) => accuracy >= 90 && stats.caught + stats.missed >= 10 },
   { id: "level5", icon: "🚀", name: "Mitad de camino", desc: "Llega al nivel 5 (Bosque Encantado)", test: ({ level }) => level >= 5 },
   { id: "level10", icon: "⚡", name: "Dimensión Imposible", desc: "Llega al nivel 10 (900+ puntos)", test: ({ level }) => level >= 10 },
-  { id: "near1000", icon: "💸", name: "A un pelo de los $10", desc: "Llega a 900+ puntos (a punto de ganar $10 USD)", test: ({ score }) => score >= 900 },
-  { id: "max999", icon: "🏆", name: "Leyenda 999", desc: "Alcanza la puntuación máxima de 999 puntos", test: ({ score }) => score >= 999 },
+  { id: "near1000", icon: "💸", name: "A un pelo del Premio", desc: "Supera los 900 puntos en el Nivel 10", test: ({ score }) => score >= 900 },
+  { id: "max999", icon: "🏆", name: "Cazador Legendario", desc: "Alcanza la puntuación más alta en el Nivel 10", test: ({ score }) => score >= 999 },
 ];
 
 function missionKey() {
@@ -364,8 +364,10 @@ function Index() {
   const qualifies =
     score > 0 && (board.length < 10 || score > (board[board.length - 1]?.score ?? 0));
 
+  const GAME_URL = "https://atrapa-bichos.vercel.app";
+
   const saveToBoard = async () => {
-    const name = (nameInput.trim() || "???").toUpperCase().slice(0, 3);
+    const name = (nameInput.trim() || "CRIST").toUpperCase().slice(0, 5);
     const next = [...board, { name, score }].sort((a, b) => b.score - a.score).slice(0, 10);
     setBoard(next);
     localStorage.setItem("ab-board", JSON.stringify(next));
@@ -379,34 +381,45 @@ function Index() {
     if (tab === "global") globalBoard.fetch();
   };
 
-  // Compartir en Redes Sociales
+  // Compartir en Redes Sociales (Facebook, TikTok y Copiar con puntuación + texto + enlace oficial de Vercel)
   const shareText =
     score === 999
-      ? `¡INCREÍBLE! Logré 999 PUNTOS (Puntuación Máxima) en Atrapa Bichos de @C7Dev-77 y estuve a solo 1 punto de ganar los $10 USD 😱💸 ¿Podrás igualarme?`
+      ? `¡INCREÍBLE! Logré 999 PUNTOS en Atrapa Bichos de @C7Dev-77 y estuve a solo 1 punto de los $10 USD 😱💸 ¿Podrás superarme?`
       : score >= 900
-        ? `¡Casi gano los $10 USD! Hice ${score} puntos en Atrapa Bichos de @C7Dev-77 en el Nivel 10 (solo 9 insectos ultra rápidos) 😱💸 ¿Podrás superarme?`
-        : `¡Hice ${score} puntos en Atrapa Bichos de @C7Dev-77 y llegué al Nivel ${level} (${THEME_NAMES[theme]})! 🦟🎯 ¿Puedes superarme?`;
+        ? `¡Casi gano los $10 USD! Logré ${score} puntos en Atrapa Bichos de @C7Dev-77 en el Nivel 10 😱💸 ¿Podrás superarme?`
+        : `¡Logré ${score} puntos en Atrapa Bichos de @C7Dev-77 y alcancé el Nivel ${level} (${THEME_NAMES[theme]})! 🎯 ¿Puedes superarme?`;
 
-  const shareOnTwitter = () => {
-    const url = typeof window !== "undefined" ? window.location.origin : "https://atrapa-bichos.vercel.app";
-    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`, "_blank");
+  const getFullSharePayload = () => {
+    return `${shareText}\n🎮 Juega gratis aquí: ${GAME_URL}`;
   };
 
-  const shareOnWhatsApp = () => {
-    const url = typeof window !== "undefined" ? window.location.origin : "https://atrapa-bichos.vercel.app";
-    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText + " Juega aquí: " + url)}`, "_blank");
+  const shareOnFacebook = () => {
+    const payload = getFullSharePayload();
+    void navigator.clipboard.writeText(payload);
+    window.open(
+      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(GAME_URL)}&quote=${encodeURIComponent(payload)}`,
+      "_blank",
+      "noopener,noreferrer,width=620,height=580"
+    );
+  };
+
+  const shareOnTikTok = () => {
+    const payload = getFullSharePayload();
+    void navigator.clipboard.writeText(payload);
+    pushToast("📋 ¡Copiado! Pégalo en tu TikTok 🎵");
+    window.open("https://www.tiktok.com/", "_blank", "noopener,noreferrer");
   };
 
   const copyShareLink = () => {
-    const url = typeof window !== "undefined" ? window.location.origin : "https://atrapa-bichos.vercel.app";
-    void navigator.clipboard.writeText(`${shareText}\n${url}`);
-    pushToast("📋 ¡Copiado al portapapeles para compartir!");
+    const payload = getFullSharePayload();
+    void navigator.clipboard.writeText(payload);
+    pushToast("📋 ¡Puntuación + texto + enlace copiados!");
   };
 
   const missionProgress = Math.min(100, Math.round((missionCount / MISSION_TARGET) * 100));
 
   return (
-    <main className="relative h-screen w-screen overflow-hidden bg-meadow select-none">
+    <main className="relative h-[100dvh] w-full min-h-screen overflow-hidden bg-meadow select-none">
       <AntGame
         state={state}
         paused={paused}
@@ -470,7 +483,7 @@ function Index() {
           {/* Temporizador de nivel con tiempo reducido por nivel */}
           <div className={`rounded-2xl sm:rounded-3xl px-4 py-2 sm:px-5 sm:py-3 text-right shadow-toy backdrop-blur-sm border transition-colors ${timeLeft <= 8 ? "bg-destructive/90 text-destructive-foreground border-destructive animate-pulse" : "bg-card/90 border-border/50"}`}>
             <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest opacity-80">
-              Tiempo Nivel {level} ({getSecondsForLevel(level)}s)
+              Tiempo Restante
             </p>
             <p className="font-display text-3xl sm:text-4xl leading-none">{timeLeft}s</p>
           </div>
@@ -517,19 +530,13 @@ function Index() {
         </div>
       )}
 
-      {/* ─── PANTALLA DE ANUNCIO AMPLIA EN TODA LA PANTALLA Y RESPONSIVE ─── */}
+      {/* ─── PANTALLA DE ANUNCIO AMPLIA, COMPACTA Y CON FONDO BLANCO ─── */}
       {showAdModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/90 p-3 sm:p-6 md:p-8 backdrop-blur-xl animate-enter overflow-y-auto">
-          {/* Fondo con resplandores dorados ambientales */}
-          <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-            <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-amber-500/20 blur-3xl animate-pulse" />
-            <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-yellow-400/20 blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
-          </div>
-
-          <div className="relative flex min-h-[85vh] sm:min-h-[88vh] w-full max-w-5xl flex-col justify-between overflow-hidden rounded-[2rem] sm:rounded-[3rem] border-2 border-amber-400/60 bg-gradient-to-b from-zinc-900/95 via-card/95 to-zinc-950/95 p-5 sm:p-8 md:p-10 shadow-[0_0_60px_rgba(245,158,11,0.25)]">
-            {/* Cabecera superior con badge y botón cerrar */}
-            <div className="flex items-center justify-between border-b border-border/40 pb-3 sm:pb-4">
-              <div className="inline-flex items-center gap-2 rounded-full bg-amber-400/15 px-3.5 py-1 sm:px-4 sm:py-1.5 text-xs sm:text-sm font-extrabold uppercase tracking-widest text-amber-400 border border-amber-400/30 shadow-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-2 sm:p-4 md:p-6 backdrop-blur-sm animate-enter">
+          <div className="relative flex max-h-[94dvh] w-[96%] sm:w-full max-w-4xl flex-col justify-between rounded-3xl sm:rounded-[2.5rem] border-2 border-amber-400 bg-white p-3.5 sm:p-6 md:p-7 shadow-2xl overflow-hidden">
+            {/* Cabecera con badge y botón cerrar */}
+            <div className="flex items-center justify-between border-b border-zinc-200 pb-2.5">
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-black uppercase tracking-widest text-amber-800 border border-amber-300">
                 <span>💰</span> DESAFÍO OFICIAL C7Dev_
               </div>
 
@@ -539,7 +546,7 @@ function Index() {
                   setShowAdModal(false);
                   if (state === "idle") start();
                 }}
-                className="flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center rounded-full bg-card border border-border text-foreground font-bold shadow-toy transition-transform active:scale-90 hover:bg-accent hover:border-amber-400 cursor-pointer"
+                className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-zinc-100 border border-zinc-300 text-zinc-700 font-bold shadow-toy transition-transform active:scale-90 hover:bg-zinc-200 hover:text-black cursor-pointer text-sm"
                 aria-label="Cerrar anuncio"
                 title="Cerrar y jugar"
               >
@@ -547,61 +554,60 @@ function Index() {
               </button>
             </div>
 
-            {/* Contenido principal amplio */}
-            <div className="my-auto py-4 sm:py-6 text-center flex flex-col items-center">
-              {/* Iconos animados */}
-              <div className="flex items-center justify-center gap-3 sm:gap-4 text-4xl sm:text-6xl md:text-7xl animate-bounce">
+            {/* Contenido amplio y limpio con fondo blanco */}
+            <div className="my-auto py-2 sm:py-3 text-center flex flex-col items-center">
+              <div className="flex items-center justify-center gap-3 text-3xl sm:text-4xl animate-bounce">
                 <span>💵</span>
                 <span>🏆</span>
                 <span>💸</span>
               </div>
 
-              <h2 className="mt-3 sm:mt-4 font-display text-2xl sm:text-4xl md:text-5xl lg:text-6xl text-amber-400 leading-tight drop-shadow-[0_4px_16px_rgba(245,158,11,0.4)] max-w-4xl">
+              <h2 className="mt-1.5 sm:mt-2 font-display text-xl sm:text-3xl md:text-4xl text-amber-600 font-black leading-tight drop-shadow-xs">
                 ¡GANA $10 USD POR CADA 1,000 PUNTOS!
               </h2>
 
-              <p className="mt-2 sm:mt-3 max-w-2xl text-xs sm:text-base md:text-lg text-foreground/90 font-medium leading-relaxed">
-                Supera los 10 niveles antes de que el tiempo se agote, caza los insectos más veloces y acumula 1,000 puntos para ganar <strong>$10 dólares en efectivo</strong> transferidos al instante.
+              <p className="mt-1 max-w-2xl text-xs sm:text-sm text-zinc-700 font-semibold leading-relaxed">
+                Supera los 10 niveles y acumula 1,000 puntos en una sola partida para ganar <strong>$10 dólares en efectivo</strong> transferidos al instante.
               </p>
 
-              {/* Grid amplio de 4 columnas en desktop / 2 en tablet y móvil */}
-              <div className="mt-5 sm:mt-8 grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 text-left">
-                <div className="rounded-2xl bg-muted/70 p-3.5 sm:p-4 border border-amber-400/25 shadow-toy">
-                  <span className="text-xl sm:text-2xl">⏱️</span>
-                  <p className="mt-1 font-bold text-amber-400 text-xs sm:text-base">Tiempo Decreciente</p>
-                  <p className="text-muted-foreground text-[11px] sm:text-xs mt-0.5">L1: 45s • L2: 43s ... L10: ¡25s!</p>
+              {/* 4 Cards limpias en tonos cálidos claros */}
+              <div className="mt-3 sm:mt-4 grid w-full grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 text-left">
+                <div className="rounded-xl bg-amber-50/80 p-2.5 sm:p-3 border border-amber-200/90 shadow-sm">
+                  <span className="text-base sm:text-lg">⚡</span>
+                  <p className="mt-0.5 font-bold text-amber-900 text-xs sm:text-sm">10 Niveles</p>
+                  <p className="text-zinc-600 text-[11px] mt-0.5">Dificultad progresiva</p>
                 </div>
-                <div className="rounded-2xl bg-muted/70 p-3.5 sm:p-4 border border-amber-400/25 shadow-toy">
-                  <span className="text-xl sm:text-2xl">🦗</span>
-                  <p className="mt-1 font-bold text-amber-400 text-xs sm:text-base">Menos Insectos</p>
-                  <p className="text-muted-foreground text-[11px] sm:text-xs mt-0.5">Las especies lentas desaparecen al subir</p>
+                <div className="rounded-xl bg-amber-50/80 p-2.5 sm:p-3 border border-amber-200/90 shadow-sm">
+                  <span className="text-base sm:text-lg">⏱️</span>
+                  <p className="mt-0.5 font-bold text-amber-900 text-xs sm:text-sm">Contrarreloj</p>
+                  <p className="text-zinc-600 text-[11px] mt-0.5">Reflejos y agilidad</p>
                 </div>
-                <div className="rounded-2xl bg-muted/70 p-3.5 sm:p-4 border border-amber-400/25 shadow-toy">
-                  <span className="text-xl sm:text-2xl">⚡</span>
-                  <p className="mt-1 font-bold text-amber-400 text-xs sm:text-base">Nivel 10 Épico</p>
-                  <p className="text-muted-foreground text-[11px] sm:text-xs mt-0.5">Solo 9 bichos de las 3 razas más veloces</p>
+                <div className="rounded-xl bg-amber-50/80 p-2.5 sm:p-3 border border-amber-200/90 shadow-sm">
+                  <span className="text-base sm:text-lg">🎯</span>
+                  <p className="mt-0.5 font-bold text-amber-900 text-xs sm:text-sm">Puntería Total</p>
+                  <p className="text-zinc-600 text-[11px] mt-0.5">Caza insectos y combos</p>
                 </div>
-                <div className="rounded-2xl bg-muted/70 p-3.5 sm:p-4 border border-amber-400/25 shadow-toy">
-                  <span className="text-xl sm:text-2xl">💸</span>
-                  <p className="mt-1 font-bold text-amber-400 text-xs sm:text-base">Puntuación Máxima</p>
-                  <p className="text-muted-foreground text-[11px] sm:text-xs mt-0.5">¡Avanza hasta 999 puntos y reclama!</p>
+                <div className="rounded-xl bg-amber-50/80 p-2.5 sm:p-3 border border-amber-200/90 shadow-sm">
+                  <span className="text-base sm:text-lg">💸</span>
+                  <p className="mt-0.5 font-bold text-amber-900 text-xs sm:text-sm">Premio Seguro</p>
+                  <p className="text-zinc-600 text-[11px] mt-0.5">¡Llega a 1,000 puntos!</p>
                 </div>
               </div>
 
-              <p className="mt-3 sm:mt-4 text-[10px] sm:text-xs text-muted-foreground italic">
-                * Promoción oficial para todos los jugadores. Sujeto a disponibilidad de insectos en el nivel 10.
+              <p className="mt-2 text-[10px] text-zinc-500 italic">
+                * Promoción oficial para todos los jugadores. Reclama tu recompensa al alcanzar los 1,000 puntos.
               </p>
             </div>
 
-            {/* Botón CTA inferior grande y expansivo */}
-            <div className="pt-3 sm:pt-4 border-t border-border/40">
+            {/* Botón CTA ancho */}
+            <div className="pt-2 border-t border-zinc-200">
               <button
                 id="btn-accept-ad"
                 onClick={() => {
                   setShowAdModal(false);
                   start();
                 }}
-                className="w-full rounded-full bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 py-3.5 sm:py-5 px-6 font-display text-lg sm:text-2xl md:text-3xl text-zinc-950 font-black shadow-[0_0_30px_rgba(245,158,11,0.5)] transition-all hover:scale-[1.01] hover:brightness-110 active:scale-95 flex items-center justify-center gap-3 cursor-pointer"
+                className="w-full rounded-full bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 py-2.5 sm:py-3.5 px-6 font-display text-base sm:text-xl md:text-2xl text-zinc-950 font-black shadow-lg transition-all hover:scale-[1.01] hover:brightness-105 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
               >
                 {adCountdown > 0 ? (
                   <>⏳ Comenzar Desafío ({adCountdown}s)...</>
@@ -614,124 +620,199 @@ function Index() {
         </div>
       )}
 
-      {/* ─── MENÚ PRINCIPAL O PANTALLA DE FIN DE PARTIDA ─── */}
+      {/* ─── MENÚ PRINCIPAL O PANTALLA DE FIN DE PARTIDA AMPLIA Y SIN SCROLL ─── */}
       {state !== "playing" && (
-        <div className="absolute inset-0 z-30 grid place-items-center overflow-y-auto bg-foreground/35 p-4 sm:p-6 backdrop-blur-md">
-          <div className="w-full max-w-md rounded-[2.5rem] bg-card p-6 sm:p-8 text-center shadow-toy border border-border">
+        <div className="absolute inset-0 z-30 flex items-center justify-center p-2.5 sm:p-5 md:p-6 bg-black/40 backdrop-blur-md">
+          <div className="w-[96%] sm:w-full max-w-2xl sm:max-w-3xl lg:max-w-4xl max-h-[95dvh] rounded-3xl sm:rounded-[2.5rem] bg-card/95 p-3.5 sm:p-6 md:p-8 text-center shadow-toy border border-border flex flex-col justify-between overflow-hidden">
             
-            {/* Banner llamativo para volver a ver la promo en menú */}
-            {state === "idle" && (
-              <button
-                onClick={handleStartWithAd}
-                className="mb-4 w-full rounded-2xl bg-gradient-to-r from-amber-500/20 via-yellow-400/25 to-amber-500/20 p-3 text-center border-2 border-amber-400/60 shadow-toy transition-transform hover:scale-[1.02] active:scale-95 cursor-pointer"
-              >
-                <p className="text-xs font-black uppercase tracking-wider text-amber-500">💰 DESAFÍO OFICIAL $10 USD</p>
-                <p className="font-display text-lg text-foreground">¡Consigue 1,000 puntos y cobra! 🔥</p>
-              </button>
-            )}
+            {/* Header del menú */}
+            <div>
+              {/* Banner llamativo de la promo */}
+              {state === "idle" && (
+                <button
+                  onClick={handleStartWithAd}
+                  className="mb-2 sm:mb-3 w-full rounded-xl sm:rounded-2xl bg-gradient-to-r from-amber-500/20 via-yellow-400/25 to-amber-500/20 py-2 px-3 text-center border border-amber-400/60 shadow-toy transition-transform hover:scale-[1.01] active:scale-95 cursor-pointer flex items-center justify-between gap-2"
+                >
+                  <span className="text-xs font-black uppercase tracking-wider text-amber-500 flex items-center gap-1">
+                    💰 DESAFÍO $10 USD
+                  </span>
+                  <span className="font-display text-xs sm:text-sm text-foreground">
+                    ¡Consigue 1,000 puntos y cobra! 🔥
+                  </span>
+                  <span className="text-xs text-amber-400 font-bold hidden sm:inline">Ver detalles ➔</span>
+                </button>
+              )}
 
-            <h1 className="font-display text-3xl sm:text-5xl text-primary">
-              {state === "idle" ? "¡Atrapa Bichos!" : "¡Tiempo Agotado!"}
-            </h1>
+              <h1 className="font-display text-2xl sm:text-4xl lg:text-5xl text-primary">
+                {state === "idle" ? "¡Atrapa Bichos!" : "¡Tiempo Agotado!"}
+              </h1>
 
-            {/* MENSAJE DE LA BROMA CUANDO TE QUEDAS EN 999 PUNTOS O EN EL NIVEL 10 */}
-            {state === "over" && score >= 900 ? (
-              <div className="mt-3 rounded-2xl bg-amber-500/15 p-4 border-2 border-amber-400 text-left animate-enter">
-                <div className="flex items-center gap-2">
-                  <span className="text-3xl">😱💸</span>
-                  <div>
-                    <p className="font-display text-xl text-amber-400">
-                      {score === 999
-                        ? "¡¡999 PUNTOS!! A SOLO 1 PUNTO DE LOS $10 USD"
-                        : `¡¡A ${1000 - score} PUNTOS DE LOS $10 USD!!`}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Lograste {score}/1,000 puntos {score === 999 && "🏆 (PUNTUACIÓN MÁXIMA)"}
-                    </p>
-                  </div>
-                </div>
-                <p className="mt-2 text-xs sm:text-sm text-foreground leading-snug">
-                  {score === 999
-                    ? "¡Increíble reflejo! Lograste 999 puntos, el límite absoluto del juego. Estuviste a solo 1 punto de cobrar tus $10 USD... pero el cajero de C7Dev_ se quedó sin cambio 😂 ¡Comparte tu récord mundial!"
-                    : "Los 9 insectos del Nivel 10 (Moscas, Avispas y Mosquitos) eran demasiado veloces... y el servidor de pagos de C7Dev_ está temporalmente en mantenimiento 😂 ¡Comparte tu puntuación!"}
+              {/* Texto limpio sin trucos ni spoilers */}
+              {state === "idle" ? (
+                <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
+                  Toca los insectos que corren por la pantalla, supera los 10 niveles y bate tu récord.
                 </p>
-              </div>
-            ) : (
-              <p className="mt-3 text-base sm:text-lg text-muted-foreground">
-                {state === "idle"
-                  ? "10 Niveles con tiempo decreciente (45s a 25s). Cada nivel tiene menos insectos y más rápidos."
-                  : `Atrapaste ${stats.caught} bichos y alcanzaste el Nivel ${level} (${THEME_NAMES[theme]}).`}
-              </p>
-            )}
-
-            {state === "over" && newBest && (
-              <p className="mt-3 font-display text-2xl text-accent-foreground animate-bounce">
-                🎉 ¡Nuevo récord personal!
-              </p>
-            )}
-
-            {state === "over" && (
-              <>
-                <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
-                  <div className="rounded-2xl bg-muted p-2.5 sm:p-3">
-                    <p className="text-[10px] sm:text-xs font-bold uppercase text-muted-foreground">Puntos</p>
-                    <p className="font-display text-2xl sm:text-3xl text-foreground">{score}</p>
+              ) : score >= 900 ? (
+                <div className="mt-2 rounded-2xl bg-amber-500/15 p-3 border-2 border-amber-400 text-left animate-enter">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl sm:text-3xl">😱💸</span>
+                    <div>
+                      <p className="font-display text-base sm:text-xl text-amber-400">
+                        {score === 999
+                          ? "¡¡999 PUNTOS!! A SOLO 1 PUNTO DE LOS $10 USD"
+                          : `¡¡A ${1000 - score} PUNTOS DE LOS $10 USD!!`}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Lograste {score}/1,000 puntos {score === 999 && "🏆 (PUNTUACIÓN MÁXIMA)"}
+                      </p>
+                    </div>
                   </div>
-                  <div className="rounded-2xl bg-muted p-2.5 sm:p-3">
-                    <p className="text-[10px] sm:text-xs font-bold uppercase text-muted-foreground">Nivel</p>
-                    <p className="font-display text-2xl sm:text-3xl text-primary">{level}/10</p>
-                  </div>
-                  <div className="rounded-2xl bg-muted p-2.5 sm:p-3">
-                    <p className="text-[10px] sm:text-xs font-bold uppercase text-muted-foreground">Precisión</p>
-                    <p className="font-display text-2xl sm:text-3xl text-foreground">{accuracy}%</p>
-                  </div>
+                  <p className="mt-1.5 text-xs text-foreground leading-snug">
+                    {score === 999
+                      ? "¡Increíbles reflejos! Llegaste a 999 puntos, a solo 1 punto de los $10 USD... pero el cajero de C7Dev_ se quedó sin cambio 😂 ¡Comparte tu récord mundial!"
+                      : "¡Estuviste muy cerca de los 1,000 puntos! Comparte tu récord y reta a tus amigos a ver si alguien puede superar tu marca."}
+                  </p>
                 </div>
+              ) : (
+                <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
+                  Atrapaste {stats.caught} bichos y alcanzaste el Nivel {level} ({THEME_NAMES[theme]}).
+                </p>
+              )}
 
-                {/* BOTONES PARA COMPARTIR EN REDES SOCIALES */}
-                <div className="mt-4 rounded-2xl bg-muted/60 p-3.5 border border-border">
-                  <p className="text-xs font-bold text-foreground mb-2">📢 ¡Comparte tu puntuación máxima!</p>
-                  <div className="flex justify-center gap-2">
-                    <button
-                      onClick={shareOnWhatsApp}
-                      className="flex-1 rounded-full bg-[#25D366] px-3 py-2 text-xs font-bold text-white shadow-toy transition-transform active:scale-95 flex items-center justify-center gap-1 cursor-pointer"
-                    >
-                      💬 WhatsApp
-                    </button>
-                    <button
-                      onClick={shareOnTwitter}
-                      className="flex-1 rounded-full bg-zinc-900 px-3 py-2 text-xs font-bold text-white shadow-toy transition-transform active:scale-95 flex items-center justify-center gap-1 border border-zinc-700 cursor-pointer"
-                    >
-                      𝕏 Twitter
-                    </button>
-                    <button
-                      onClick={copyShareLink}
-                      className="rounded-full bg-primary/20 px-3 py-2 text-xs font-bold text-primary transition-transform active:scale-95 hover:bg-primary/30 cursor-pointer"
-                      title="Copiar texto y enlace"
-                    >
-                      📋 Copiar
-                    </button>
+              {state === "over" && newBest && (
+                <p className="mt-1 font-display text-lg sm:text-xl text-accent-foreground animate-bounce">
+                  🎉 ¡Nuevo récord personal!
+                </p>
+              )}
+            </div>
+
+            {/* Bloque central: 2 columnas en Desktop / Tablet, 1 en Móvil */}
+            <div className="my-2 sm:my-3 grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3 text-left">
+              {state === "over" ? (
+                <>
+                  <div className="rounded-2xl bg-muted p-2.5 sm:p-3 flex items-center justify-around">
+                    <div className="text-center">
+                      <p className="text-[10px] font-bold uppercase text-muted-foreground">Puntos</p>
+                      <p className="font-display text-xl sm:text-2xl text-foreground">{score}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[10px] font-bold uppercase text-muted-foreground">Nivel</p>
+                      <p className="font-display text-xl sm:text-2xl text-primary">{level}/10</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[10px] font-bold uppercase text-muted-foreground">Precisión</p>
+                      <p className="font-display text-xl sm:text-2xl text-foreground">{accuracy}%</p>
+                    </div>
                   </div>
-                </div>
-              </>
-            )}
 
-            {/* Guardar en tabla de récords */}
+                  {/* Compartir en redes */}
+                  <div className="rounded-2xl bg-muted/60 p-2.5 sm:p-3 border border-border flex flex-col justify-center">
+                    <p className="text-xs font-bold text-foreground mb-1.5 text-center">📢 ¡Comparte tu récord!</p>
+                    <div className="flex justify-center gap-1.5 sm:gap-2">
+                      <button
+                        onClick={shareOnFacebook}
+                        className="flex-1 rounded-full bg-[#1877F2] py-2 px-2.5 text-xs font-extrabold text-white shadow-toy transition-transform active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer hover:brightness-110"
+                        title="Compartir en Facebook"
+                      >
+                        <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                        </svg>
+                        Facebook
+                      </button>
+                      <button
+                        onClick={shareOnTikTok}
+                        className="flex-1 rounded-full bg-black py-2 px-2.5 text-xs font-extrabold text-white shadow-toy transition-transform active:scale-95 flex items-center justify-center gap-1.5 border border-zinc-700 cursor-pointer hover:brightness-125"
+                        title="Compartir en TikTok"
+                      >
+                        <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                          <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-1.01-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.24 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+                        </svg>
+                        TikTok
+                      </button>
+                      <button
+                        onClick={copyShareLink}
+                        className="rounded-full bg-primary/20 py-2 px-3 text-xs font-bold text-primary transition-transform active:scale-95 hover:bg-primary/30 cursor-pointer"
+                        title="Copiar puntuación + texto + link"
+                      >
+                        📋 Copiar
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Columna izquierda: Misión diaria y récord */}
+                  <div className="rounded-2xl bg-muted/70 p-3 flex flex-col justify-between border border-border/50">
+                    <div>
+                      <div className="flex items-center justify-between text-xs font-bold">
+                        <span className="text-foreground">🎯 Misión diaria: 30 bichos</span>
+                        <span className="text-muted-foreground">
+                          {Math.min(missionCount, MISSION_TARGET)}/{MISSION_TARGET}
+                          {missionDone && " ✅"}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-background">
+                        <div
+                          className="h-full rounded-full bg-primary transition-all"
+                          style={{ width: `${missionProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                    {best > 0 && (
+                      <p className="mt-2 text-xs font-bold text-secondary-foreground">
+                        🏆 Récord personal: <span className="text-primary font-display text-sm">{best} pts</span>
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Columna derecha: Botones de navegación de récords y logros */}
+                  <div className="rounded-2xl bg-muted/70 p-3 flex flex-col justify-center gap-2 border border-border/50">
+                    <p className="text-xs font-bold text-foreground text-center">Clasificaciones y Logros</p>
+                    <div className="flex gap-1.5 sm:gap-2">
+                      <button
+                        id="btn-open-local-board"
+                        onClick={() => openBoard("local")}
+                        className="flex-1 rounded-full border-2 border-border bg-background py-1.5 px-2 font-bold text-xs text-foreground transition-colors hover:bg-accent cursor-pointer"
+                      >
+                        🏅 Local
+                      </button>
+                      <button
+                        id="btn-open-global-board"
+                        onClick={() => openBoard("global")}
+                        className="flex-1 rounded-full border-2 border-border bg-background py-1.5 px-2 font-bold text-xs text-foreground transition-colors hover:bg-accent cursor-pointer"
+                      >
+                        🌍 Global
+                      </button>
+                      <button
+                        id="btn-open-achievements"
+                        onClick={() => setShowAchievements(true)}
+                        className="flex-1 rounded-full border-2 border-border bg-background py-1.5 px-2 font-bold text-xs text-foreground transition-colors hover:bg-accent cursor-pointer"
+                      >
+                        🏆 {unlocked.length}/{ACHIEVEMENTS.length}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Input para guardar en Top 10 si califica */}
             {state === "over" && qualifies && !boardSaved && (
-              <div className="mt-4 rounded-2xl bg-accent/60 p-4">
-                <p className="font-bold text-foreground">¡Entras en el Top 10! Escribe tus iniciales:</p>
-                <div className="mt-2 flex justify-center gap-2">
+              <div className="my-1.5 rounded-2xl bg-accent/60 p-2.5 flex items-center justify-between gap-2">
+                <p className="font-bold text-xs text-foreground text-left">¡Entras al Top 10! Nombre (5 letras):</p>
+                <div className="flex items-center gap-2">
                   <input
                     id="input-initials"
                     value={nameInput}
-                    onChange={(e) => setNameInput(e.target.value.toUpperCase().slice(0, 3))}
-                    placeholder="ABC"
-                    maxLength={3}
-                    className="w-24 rounded-full border-2 border-border bg-background px-4 py-2 text-center font-display text-xl tracking-widest text-foreground uppercase outline-none focus:border-primary"
+                    onChange={(e) => setNameInput(e.target.value.toUpperCase().slice(0, 5))}
+                    placeholder="ABCDE"
+                    maxLength={5}
+                    className="w-28 rounded-full border border-border bg-background px-3 py-1 text-center font-display text-base tracking-widest text-foreground uppercase outline-none focus:border-primary"
                   />
                   <button
                     id="btn-save-score"
                     onClick={saveToBoard}
-                    className="rounded-full bg-primary px-5 py-2 font-display text-lg text-primary-foreground shadow-toy transition-transform active:scale-95"
+                    className="rounded-full bg-primary px-4 py-1 font-display text-sm text-primary-foreground shadow-toy transition-transform active:scale-95"
                   >
                     Guardar
                   </button>
@@ -739,88 +820,20 @@ function Index() {
               </div>
             )}
 
-            {/* Misión diaria */}
-            <div className="mt-4 rounded-2xl bg-muted p-3 text-left">
-              <div className="flex items-center justify-between">
-                <p className="text-xs sm:text-sm font-bold text-foreground">
-                  🎯 Misión diaria: atrapa {MISSION_TARGET} bichos
-                </p>
-                <p className="text-xs sm:text-sm font-bold text-muted-foreground">
-                  {Math.min(missionCount, MISSION_TARGET)}/{MISSION_TARGET}
-                  {missionDone && " ✅"}
-                </p>
-              </div>
-              <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-background">
-                <div
-                  className="h-full rounded-full bg-primary transition-all"
-                  style={{ width: `${missionProgress}%` }}
-                />
-              </div>
+            {/* Botón Jugar grande y créditos */}
+            <div>
+              <button
+                id="btn-play"
+                onClick={start}
+                className="w-full rounded-full bg-primary py-3 sm:py-3.5 px-8 font-display text-xl sm:text-2xl text-primary-foreground shadow-toy transition-transform active:scale-95 hover:brightness-110 cursor-pointer"
+              >
+                {state === "idle" ? "¡Jugar Ahora!" : "Intentar otra vez"}
+              </button>
+
+              <p className="mt-2 text-[11px] font-semibold text-muted-foreground">
+                Desarrollado con ❤️ por <span className="font-bold text-primary">C7Dev_</span>
+              </p>
             </div>
-
-            {best > 0 && (
-              <p className="mt-2 text-sm font-bold text-secondary-foreground">Récord personal: {best} pts</p>
-            )}
-
-            {state === "idle" && (
-              <>
-                {/* Insectos por velocidad */}
-                <div className="mt-3 rounded-2xl bg-muted/60 p-3 text-left border border-border/50">
-                  <p className="text-xs font-bold text-foreground mb-1">🦗 Desaparición de bichos lentos:</p>
-                  <p className="text-[11px] text-muted-foreground mb-2">
-                    A medida que subes de nivel, las especies lentas desaparecen. En el <strong>Nivel 10</strong> solo hay <strong>9 insectos</strong> (3 Moscas, 3 Avispas y 3 Mosquitos).
-                  </p>
-                  <div className="flex flex-wrap gap-1 text-[10px] text-muted-foreground">
-                    <span className="rounded-md bg-background px-1.5 py-0.5">L1-2: 🐛 Oruga</span>
-                    <span className="rounded-md bg-background px-1.5 py-0.5">L1-3: 🪲 Escarabajo</span>
-                    <span className="rounded-md bg-background px-1.5 py-0.5">L2-4: 🐜 Hormiga</span>
-                    <span className="rounded-md bg-background px-1.5 py-0.5">L3-5: 🐞 Mariquita</span>
-                    <span className="rounded-md bg-background px-1.5 py-0.5">L4-6: 🕷️ Araña</span>
-                    <span className="rounded-md bg-background px-1.5 py-0.5">L5-7: 🐝 Abeja</span>
-                    <span className="rounded-md bg-background px-1.5 py-0.5">L6-8: 🦋 Mariposa</span>
-                    <span className="rounded-md bg-background px-1.5 py-0.5 font-bold text-foreground">L7-10: 🪰 Mosca</span>
-                    <span className="rounded-md bg-background px-1.5 py-0.5 font-bold text-foreground">L8-10: 🐝 Avispa</span>
-                    <span className="rounded-md bg-amber-400/20 text-amber-500 font-bold px-1.5 py-0.5">L9-10: 🦟 Mosquito</span>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex flex-wrap justify-center gap-2">
-                  <button
-                    id="btn-open-local-board"
-                    onClick={() => openBoard("local")}
-                    className="rounded-full border-2 border-border bg-background px-4 py-2 font-bold text-xs sm:text-sm text-foreground transition-colors hover:bg-accent"
-                  >
-                    🏅 Local
-                  </button>
-                  <button
-                    id="btn-open-global-board"
-                    onClick={() => openBoard("global")}
-                    className="rounded-full border-2 border-border bg-background px-4 py-2 font-bold text-xs sm:text-sm text-foreground transition-colors hover:bg-accent"
-                  >
-                    🌍 Global
-                  </button>
-                  <button
-                    id="btn-open-achievements"
-                    onClick={() => setShowAchievements(true)}
-                    className="rounded-full border-2 border-border bg-background px-4 py-2 font-bold text-xs sm:text-sm text-foreground transition-colors hover:bg-accent"
-                  >
-                    🏆 Logros {unlocked.length}/{ACHIEVEMENTS.length}
-                  </button>
-                </div>
-              </>
-            )}
-
-            <button
-              id="btn-play"
-              onClick={start}
-              className="mt-5 w-full rounded-full bg-primary px-8 py-4 font-display text-2xl text-primary-foreground shadow-toy transition-transform active:scale-95 hover:brightness-110 cursor-pointer"
-            >
-              {state === "idle" ? "¡Jugar Ahora!" : "Intentar otra vez"}
-            </button>
-
-            <p className="mt-4 text-xs font-semibold tracking-wider text-muted-foreground">
-              Desarrollado con ❤️ por <span className="font-bold text-primary">C7Dev_</span>
-            </p>
           </div>
         </div>
       )}

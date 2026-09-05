@@ -22,6 +22,8 @@ async function getClient(): Promise<SqlClient | null> {
   const conn =
     process.env["POSTGRES_URL"] ||
     process.env["DATABASE_URL"] ||
+    process.env["NEON_URL"] ||
+    process.env["DB_URL"] ||
     process.env["STORAGE_URL"] ||
     process.env["POSTGRES_URL_NON_POOLING"];
 
@@ -61,11 +63,18 @@ export async function initDb(): Promise<void> {
     CREATE TABLE IF NOT EXISTS scores (
       id          SERIAL PRIMARY KEY,
       uuid        TEXT        NOT NULL,
-      name        CHAR(3)     NOT NULL,
+      name        VARCHAR(10) NOT NULL,
       score       INTEGER     NOT NULL,
       created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
+
+  // Safely ensure column supports 5+ chars if already created with CHAR(3)
+  try {
+    await db.sql`ALTER TABLE scores ALTER COLUMN name TYPE VARCHAR(10)`;
+  } catch {
+    // Column already compatible
+  }
 
   await db.sql`
     CREATE UNIQUE INDEX IF NOT EXISTS scores_uuid_idx ON scores (uuid)

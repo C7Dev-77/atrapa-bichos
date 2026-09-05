@@ -47,7 +47,7 @@ export const submitScore = createServerFn({ method: "POST" })
       const { upsertScore } = await import("@/lib/db");
       await upsertScore(
         uuid.slice(0, 64),
-        name.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 3) || "???",
+        name.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 5) || "???",
         Math.round(score),
       );
       return { ok: true as const };

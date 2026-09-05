@@ -679,7 +679,7 @@ export function AntGame({
       ctx.font = "bold 13px monospace";
       ctx.fillStyle = "hsl(320 100% 65% / 0.35)";
       ctx.textAlign = "center";
-      ctx.fillText("⚡ NIVEL 10: 9 INSECTOS MÁS VELOCES • PREMIO $10 USD ⚡", w / 2, 40);
+      ctx.fillText("⚡ NIVEL 10: DIMENSIÓN FINAL • PREMIO $10 USD ⚡", w / 2, 40);
       ctx.restore();
     }
   };
@@ -1190,12 +1190,16 @@ export function AntGame({
     if (!ctx) return;
 
     const resize = () => {
-      cv.width = cv.clientWidth * window.devicePixelRatio;
-      cv.height = cv.clientHeight * window.devicePixelRatio;
-      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+      const rect = cv.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      cv.width = Math.round(rect.width * dpr);
+      cv.height = Math.round(rect.height * dpr);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
     };
     resize();
     window.addEventListener("resize", resize);
+    window.addEventListener("orientationchange", resize);
 
     const loop = () => {
       const w = cv.clientWidth;
@@ -1332,6 +1336,7 @@ export function AntGame({
     return () => {
       cancelAnimationFrame(rafRef.current);
       window.removeEventListener("resize", resize);
+      window.removeEventListener("orientationchange", resize);
     };
   }, [spawn, spawnBoss, spawnPowerUp, timeLeft]);
 
