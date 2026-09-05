@@ -143,23 +143,24 @@ function Confetti() {
 function useGlobalBoard() {
   const [rows, setRows] = useState<ScoreEntry[]>([]);
   const [loading, setLoading] = useState(false);
-  const [available, setAvailable] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetch = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const result = await fetchGlobalScores();
-      if (!result.ok) throw new Error("not ok");
+      if (!result.ok) throw new Error("server error");
       setRows(result.scores ?? []);
-      setAvailable(true);
-    } catch {
-      setAvailable(false);
+    } catch (err) {
+      console.error("[useGlobalBoard]", err);
+      setError("No se pudo cargar el ranking. Verifica tu conexión.");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  return { rows, loading, available, fetch };
+  return { rows, loading, error, fetch };
 }
 
 async function postScore(name: string, score: number) {
@@ -885,13 +886,18 @@ function Index() {
                 {globalBoard.loading && (
                   <p className="mt-4 text-center text-muted-foreground animate-pulse">Cargando...</p>
                 )}
-                {!globalBoard.loading && !globalBoard.available && (
+                {!globalBoard.loading && globalBoard.error && (
                   <div className="mt-4 rounded-2xl bg-muted p-4 text-center text-sm text-muted-foreground">
-                    <p>🔌 Leaderboard global no disponible en local.</p>
-                    <p className="mt-1 opacity-70">Se activará tras el deploy en Vercel con Postgres.</p>
+                    <p>⚠️ {globalBoard.error}</p>
+                    <button
+                      onClick={globalBoard.fetch}
+                      className="mt-2 rounded-full bg-primary px-4 py-1.5 text-xs font-bold text-primary-foreground cursor-pointer hover:brightness-110"
+                    >
+                      🔄 Reintentar
+                    </button>
                   </div>
                 )}
-                {!globalBoard.loading && globalBoard.available && (
+                {!globalBoard.loading && !globalBoard.error && (
                   <ol className="mt-4 flex flex-col gap-2 max-h-60 overflow-y-auto">
                     {globalBoard.rows.length === 0 && (
                       <p className="text-center text-muted-foreground">¡Sé el primero en el ranking mundial!</p>
