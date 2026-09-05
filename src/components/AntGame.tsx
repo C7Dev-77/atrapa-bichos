@@ -42,9 +42,9 @@ type Bug = {
   kind: BugKind;
   lives: number;
   // Extra motion state
-  orbitAngle: number; // for abeja/mariposa/fly
-  pauseTimer: number; // for araña pause-sprint & fly zigzag
-  segmentPhase?: number; // for oruga wave
+  orbitAngle: number;
+  pauseTimer: number;
+  segmentPhase?: number;
 };
 
 type PowerUpType = "time" | "freeze" | "double";
@@ -77,6 +77,23 @@ type Particle = {
   size: number;
 };
 
+// Segundos por nivel según especificación del usuario:
+// Nivel 1: 45s, Nivel 2: 43s, Nivel 3: 41s ... Nivel 10: 25s
+export const LEVEL_SECONDS: Record<number, number> = {
+  1: 45,
+  2: 43,
+  3: 41,
+  4: 39,
+  5: 37,
+  6: 35,
+  7: 33,
+  8: 31,
+  9: 29,
+  10: 25,
+};
+
+export const getSecondsForLevel = (lvl: number): number => LEVEL_SECONDS[lvl] ?? 25;
+
 export const GAME_SECONDS = 45;
 
 export type GameState = "idle" | "playing" | "over";
@@ -91,6 +108,21 @@ export type GameStats = {
 };
 
 const EMPTY_STATS: GameStats = { caught: 0, missed: 0, maxCombo: 0, bosses: 0, gold: 0, dodges: 0 };
+
+// Cantidad máxima de insectos en pantalla según el nivel:
+// Al principio hay muchos, y va bajando hasta que en el Nivel 10 hay exactamente 9 insectos
+export const MAX_BUGS_PER_LEVEL: Record<number, number> = {
+  1: 18,
+  2: 16,
+  3: 14,
+  4: 13,
+  5: 12,
+  6: 11,
+  7: 10,
+  8: 10,
+  9: 9,
+  10: 9, // En el nivel 10: 3 moscas, 3 avispas, 3 mosquitos
+};
 
 export function AntGame({
   state,
@@ -177,186 +209,176 @@ export function AntGame({
     }
   };
 
+  const createBugInstance = (w: number, h: number, kind: BugKind, lvl: number): Bug => {
+    const edge = Math.random() < 0.5;
+    const r = 10 + Math.random() * 8;
+    const baseV = 1.1 + Math.random() * 0.7;
+
+    let speedFactor = 1.0;
+    switch (kind) {
+      case "oruga":
+        speedFactor = 0.45;
+        break;
+      case "escarabajo":
+        speedFactor = 0.6;
+        break;
+      case "hormiga":
+        speedFactor = 0.9;
+        break;
+      case "mariquita":
+        speedFactor = 1.15;
+        break;
+      case "araña":
+        speedFactor = 1.45;
+        break;
+      case "abeja":
+        speedFactor = 1.8;
+        break;
+      case "mariposa":
+        speedFactor = 2.2;
+        break;
+      case "mosca":
+        speedFactor = 2.8;
+        break;
+      case "avispa":
+        speedFactor = 3.3;
+        break;
+      case "mosquito":
+        speedFactor = lvl >= 10 ? 4.5 : 3.8;
+        break;
+      case "dorado":
+        speedFactor = 1.4;
+        break;
+      case "bomba":
+        speedFactor = 0.9;
+        break;
+    }
+
+    const bugRadius =
+      kind === "oruga"
+        ? r * 1.25
+        : kind === "escarabajo"
+          ? r * 1.2
+          : kind === "araña"
+            ? r * 1.1
+            : kind === "mariposa"
+              ? r * 0.9
+              : kind === "mosquito"
+                ? r * 0.75
+                : r;
+
+    const bugSpeed = baseV * speedFactor * (1 + (lvl - 1) * 0.05);
+
+    return {
+      x: edge ? w * Math.random() : Math.random() < 0.5 ? -40 : w + 40,
+      y: edge ? (Math.random() < 0.5 ? -40 : h + 40) : h * Math.random(),
+      r: bugRadius,
+      v: bugSpeed,
+      a: Math.random() * Math.PI * 2,
+      d: 0,
+      alive: true,
+      hue:
+        kind === "dorado"
+          ? 48
+          : kind === "oruga"
+            ? 95
+            : kind === "escarabajo"
+              ? 145
+              : kind === "mariquita"
+                ? 0
+                : kind === "araña"
+                  ? 10
+                  : kind === "abeja"
+                    ? 45
+                    : kind === "mariposa"
+                      ? 290
+                      : kind === "mosca"
+                        ? 210
+                        : kind === "avispa"
+                          ? 52
+                          : kind === "mosquito"
+                            ? 180
+                            : 20,
+      pop: 0,
+      value: valueForBug(kind),
+      kind,
+      lives: 1,
+      orbitAngle: Math.random() * Math.PI * 2,
+      pauseTimer: 0,
+      segmentPhase: 0,
+    };
+  };
+
   const spawn = useCallback((w: number, h: number, count = 1) => {
     const lvl = levelRef.current;
     const isLevel10 = lvl >= 10 || scoreRef.current >= 900;
+    const maxBugs = isLevel10 ? 9 : (MAX_BUGS_PER_LEVEL[lvl] ?? 9);
+    const aliveBugs = bugsRef.current.filter((b) => b.alive);
 
-    // En nivel 10 solo aparecen pocos bichos dispersos a hipervelocidad
+    if (aliveBugs.length >= maxBugs) return;
+
+    // ─── REGLA NIVEL 10: EXACTAMENTE 9 INSECTOS (3 MOSCAS, 3 AVISPAS, 3 MOSQUITOS) ───
     if (isLevel10) {
-      const aliveCount = bugsRef.current.filter((b) => b.alive).length;
-      if (aliveCount >= 3) return;
-      count = Math.min(count, 3 - aliveCount);
-      if (count <= 0) return;
+      const countMoscas = aliveBugs.filter((b) => b.kind === "mosca").length;
+      const countAvispas = aliveBugs.filter((b) => b.kind === "avispa").length;
+      const countMosquitos = aliveBugs.filter((b) => b.kind === "mosquito").length;
+
+      const toAdd: BugKind[] = [];
+      for (let i = countMoscas; i < 3; i++) toAdd.push("mosca");
+      for (let i = countAvispas; i < 3; i++) toAdd.push("avispa");
+      for (let i = countMosquitos; i < 3; i++) toAdd.push("mosquito");
+
+      for (const k of toAdd) {
+        bugsRef.current.push(createBugInstance(w, h, k, lvl));
+      }
+      return;
     }
 
-    for (let i = 0; i < count; i++) {
-      const edge = Math.random() < 0.5;
-      const r = 10 + Math.random() * 8;
-      // Velocidad según el nivel del usuario
-      const baseV = 1.0 + Math.random() * 0.8;
-      let kind: BugKind = "oruga";
+    // ─── NIVELES 1 A 9: FILTRAR ESPECIES SEGÚN VELOCIDAD (LAS LENTAS SE VAN) ───
+    // Ejemplo: en nivel 3 en adelante no hay orugas, en nivel 4 no hay escarabajos, etc.
+    const allowedKinds: BugKind[] = [];
+    if (lvl === 1) {
+      allowedKinds.push("oruga", "oruga", "escarabajo");
+    } else if (lvl === 2) {
+      allowedKinds.push("oruga", "escarabajo", "hormiga");
+    } else if (lvl === 3) {
+      // No más orugas
+      allowedKinds.push("escarabajo", "hormiga", "mariquita");
+    } else if (lvl === 4) {
+      // No más escarabajos ni orugas
+      allowedKinds.push("hormiga", "mariquita", "araña");
+    } else if (lvl === 5) {
+      // No más hormigas
+      allowedKinds.push("mariquita", "araña", "abeja");
+    } else if (lvl === 6) {
+      // No más mariquitas
+      allowedKinds.push("araña", "abeja", "mariposa");
+    } else if (lvl === 7) {
+      // No más arañas
+      allowedKinds.push("abeja", "mariposa", "mosca");
+    } else if (lvl === 8) {
+      // No más abejas
+      allowedKinds.push("mariposa", "mosca", "avispa");
+    } else {
+      // Nivel 9: No más mariposas
+      allowedKinds.push("mosca", "avispa", "mosquito");
+    }
 
-      // Pool de insectos estrictamente según velocidad y nivel
+    const bugsToAdd = Math.min(count, maxBugs - aliveBugs.length);
+
+    for (let i = 0; i < bugsToAdd; i++) {
       const roll = Math.random();
+      let kind: BugKind;
 
-      if (isLevel10) {
-        // Nivel 10: Dominan mosquitos y avispas a velocidad ridícula
-        kind = roll < 0.7 ? "mosquito" : "avispa";
-      } else if (lvl === 1) {
-        // Nivel 1: Orugas y escarabajos lentos
-        kind = roll < 0.65 ? "oruga" : "escarabajo";
-      } else if (lvl === 2) {
-        // Nivel 2: Orugas, escarabajos y hormigas
-        if (roll < 0.08) kind = "bomba";
-        else if (roll < 0.15) kind = "dorado";
-        else if (roll < 0.5) kind = "oruga";
-        else if (roll < 0.75) kind = "escarabajo";
-        else kind = "hormiga";
-      } else if (lvl === 3) {
-        // Nivel 3: Escarabajos, hormigas y mariquitas
-        if (roll < 0.08) kind = "bomba";
-        else if (roll < 0.16) kind = "dorado";
-        else if (roll < 0.45) kind = "escarabajo";
-        else if (roll < 0.75) kind = "hormiga";
-        else kind = "mariquita";
-      } else if (lvl === 4) {
-        // Nivel 4: Hormigas, mariquitas y arañas
-        if (roll < 0.09) kind = "bomba";
-        else if (roll < 0.16) kind = "dorado";
-        else if (roll < 0.45) kind = "hormiga";
-        else if (roll < 0.75) kind = "mariquita";
-        else kind = "araña";
-      } else if (lvl === 5) {
-        // Nivel 5: Mariquitas, arañas y abejas
-        if (roll < 0.09) kind = "bomba";
-        else if (roll < 0.16) kind = "dorado";
-        else if (roll < 0.45) kind = "mariquita";
-        else if (roll < 0.75) kind = "araña";
-        else kind = "abeja";
-      } else if (lvl === 6) {
-        // Nivel 6: Arañas, abejas y mariposas
-        if (roll < 0.1) kind = "bomba";
-        else if (roll < 0.16) kind = "dorado";
-        else if (roll < 0.45) kind = "araña";
-        else if (roll < 0.72) kind = "abeja";
-        else kind = "mariposa";
-      } else if (lvl === 7) {
-        // Nivel 7: Abejas, mariposas y moscas
-        if (roll < 0.1) kind = "bomba";
-        else if (roll < 0.16) kind = "dorado";
-        else if (roll < 0.42) kind = "abeja";
-        else if (roll < 0.7) kind = "mariposa";
-        else kind = "mosca";
-      } else if (lvl === 8) {
-        // Nivel 8: Mariposas, moscas y avispas
-        if (roll < 0.1) kind = "bomba";
-        else if (roll < 0.16) kind = "dorado";
-        else if (roll < 0.4) kind = "mariposa";
-        else if (roll < 0.7) kind = "mosca";
-        else kind = "avispa";
+      if (roll < 0.08 && lvl >= 2) {
+        kind = "bomba";
+      } else if (roll < 0.16 && lvl >= 2) {
+        kind = "dorado";
       } else {
-        // Nivel 9: Moscas, avispas y mosquitos
-        if (roll < 0.1) kind = "bomba";
-        else if (roll < 0.16) kind = "dorado";
-        else if (roll < 0.4) kind = "mosca";
-        else if (roll < 0.7) kind = "avispa";
-        else kind = "mosquito";
+        kind = allowedKinds[Math.floor(Math.random() * allowedKinds.length)] ?? "hormiga";
       }
 
-      // Multiplicador de velocidad según tipo de bicho
-      let speedFactor = 1.0;
-      switch (kind) {
-        case "oruga":
-          speedFactor = 0.42;
-          break;
-        case "escarabajo":
-          speedFactor = 0.58;
-          break;
-        case "hormiga":
-          speedFactor = 0.88;
-          break;
-        case "mariquita":
-          speedFactor = 1.15;
-          break;
-        case "araña":
-          speedFactor = 1.45;
-          break;
-        case "abeja":
-          speedFactor = 1.8;
-          break;
-        case "mariposa":
-          speedFactor = 2.2;
-          break;
-        case "mosca":
-          speedFactor = 2.8;
-          break;
-        case "avispa":
-          speedFactor = 3.4;
-          break;
-        case "mosquito":
-          speedFactor = isLevel10 ? 5.8 : 4.2; // hipervelocidad en nivel 10
-          break;
-        case "dorado":
-          speedFactor = 1.3;
-          break;
-        case "bomba":
-          speedFactor = 0.85;
-          break;
-      }
-
-      const bugRadius =
-        kind === "oruga"
-          ? r * 1.25
-          : kind === "escarabajo"
-            ? r * 1.2
-            : kind === "araña"
-              ? r * 1.1
-              : kind === "mariposa"
-                ? r * 0.9
-                : kind === "mosquito"
-                  ? r * 0.75
-                  : r;
-
-      const bugSpeed = baseV * speedFactor * (1 + (lvl - 1) * 0.08);
-
-      bugsRef.current.push({
-        x: edge ? w * Math.random() : Math.random() < 0.5 ? -40 : w + 40,
-        y: edge ? (Math.random() < 0.5 ? -40 : h + 40) : h * Math.random(),
-        r: bugRadius,
-        v: bugSpeed,
-        a: Math.random() * Math.PI * 2,
-        d: 0,
-        alive: true,
-        hue:
-          kind === "dorado"
-            ? 48
-            : kind === "oruga"
-              ? 95
-              : kind === "escarabajo"
-                ? 145
-                : kind === "mariquita"
-                  ? 0
-                  : kind === "araña"
-                    ? 10
-                    : kind === "abeja"
-                      ? 45
-                      : kind === "mariposa"
-                        ? 290
-                        : kind === "mosca"
-                          ? 210
-                          : kind === "avispa"
-                            ? 52
-                            : kind === "mosquito"
-                              ? 180
-                              : 20,
-        pop: 0,
-        value: valueForBug(kind),
-        kind,
-        lives: 1,
-        orbitAngle: Math.random() * Math.PI * 2,
-        pauseTimer: 0,
-        segmentPhase: 0,
-      });
+      bugsRef.current.push(createBugInstance(w, h, kind, lvl));
     }
   }, []);
 
@@ -411,7 +433,7 @@ export function AntGame({
     }
   };
 
-  // reset on new game
+  // Reset al iniciar nueva partida
   useEffect(() => {
     if (state !== "playing") return;
     const cv = canvasRef.current;
@@ -428,10 +450,22 @@ export function AntGame({
     activeEffectsRef.current = { freeze: 0, double: 0 };
     statsRef.current = { ...EMPTY_STATS };
     onComboChange(0);
-    spawn(cv.clientWidth, cv.clientHeight, 4);
+    spawn(cv.clientWidth, cv.clientHeight, MAX_BUGS_PER_LEVEL[1] ?? 18);
   }, [state, spawn, onComboChange]);
 
-  // timer
+  // Al cambiar de nivel mientras se juega, limpiar bichos que ya no pertenecen y ajustar población
+  useEffect(() => {
+    if (state !== "playing") return;
+    const cv = canvasRef.current;
+    if (!cv) return;
+    // En nivel 10 asegurar inmediatamente los 9 bichos de las 3 razas más rápidas
+    if (level >= 10 || score >= 900) {
+      bugsRef.current = bugsRef.current.filter((b) => b.kind === "mosca" || b.kind === "avispa" || b.kind === "mosquito");
+    }
+    spawn(cv.clientWidth, cv.clientHeight, MAX_BUGS_PER_LEVEL[level] ?? 9);
+  }, [level, score, state, spawn]);
+
+  // Temporizador cada segundo
   useEffect(() => {
     if (state !== "playing" || paused) return;
     const id = window.setInterval(() => onTick(-1), 1000);
@@ -449,7 +483,6 @@ export function AntGame({
 
   const drawBackground = (ctx: CanvasRenderingContext2D, w: number, h: number, t: Theme, tick: number) => {
     if (t === "prado") {
-      // Nivel 1: Prado Verde
       const sky = ctx.createLinearGradient(0, 0, 0, h);
       sky.addColorStop(0, "hsl(200 80% 84%)");
       sky.addColorStop(0.55, "hsl(150 45% 78%)");
@@ -469,14 +502,12 @@ export function AntGame({
         ctx.fill();
       }
     } else if (t === "jardin") {
-      // Nivel 2: Jardín Floral
       const sky = ctx.createLinearGradient(0, 0, 0, h);
       sky.addColorStop(0, "hsl(330 65% 88%)");
       sky.addColorStop(0.6, "hsl(300 40% 82%)");
       sky.addColorStop(1, "hsl(140 45% 65%)");
       ctx.fillStyle = sky;
       ctx.fillRect(0, 0, w, h);
-      // Pétalos flotando
       for (let i = 0; i < 16; i++) {
         const px = (i * 131 + tick * (0.6 + (i % 3) * 0.3)) % (w + 20);
         const py = (i * 87 + tick * (0.8 + (i % 4) * 0.2)) % (h + 20);
@@ -486,19 +517,16 @@ export function AntGame({
         ctx.fill();
       }
     } else if (t === "desierto") {
-      // Nivel 3: Desierto Dorado
       const sky = ctx.createLinearGradient(0, 0, 0, h);
       sky.addColorStop(0, "hsl(32 90% 78%)");
       sky.addColorStop(0.6, "hsl(28 85% 65%)");
       sky.addColorStop(1, "hsl(38 75% 55%)");
       ctx.fillStyle = sky;
       ctx.fillRect(0, 0, w, h);
-      // Sol ardiente
       ctx.fillStyle = "hsl(48 100% 70% / 0.85)";
       ctx.beginPath();
       ctx.arc(w * 0.75, 90, 55, 0, Math.PI * 2);
       ctx.fill();
-      // Dunas
       ctx.fillStyle = "hsl(35 80% 48%)";
       ctx.beginPath();
       ctx.moveTo(0, h * 0.75);
@@ -509,7 +537,6 @@ export function AntGame({
       ctx.closePath();
       ctx.fill();
     } else if (t === "playa") {
-      // Nivel 4: Playa Tropical
       const sky = ctx.createLinearGradient(0, 0, 0, h);
       sky.addColorStop(0, "hsl(195 90% 78%)");
       sky.addColorStop(0.55, "hsl(190 85% 70%)");
@@ -528,14 +555,12 @@ export function AntGame({
         ctx.stroke();
       }
     } else if (t === "bosque") {
-      // Nivel 5: Bosque Encantado
       const sky = ctx.createLinearGradient(0, 0, 0, h);
       sky.addColorStop(0, "hsl(160 50% 20%)");
       sky.addColorStop(0.6, "hsl(145 45% 35%)");
       sky.addColorStop(1, "hsl(135 60% 25%)");
       ctx.fillStyle = sky;
       ctx.fillRect(0, 0, w, h);
-      // Rayos de luz de bosque
       ctx.fillStyle = "hsl(60 80% 85% / 0.08)";
       for (let i = 0; i < 4; i++) {
         ctx.beginPath();
@@ -548,14 +573,12 @@ export function AntGame({
         ctx.fill();
       }
     } else if (t === "pantano") {
-      // Nivel 6: Pantano Místico
       const sky = ctx.createLinearGradient(0, 0, 0, h);
       sky.addColorStop(0, "hsl(180 50% 14%)");
       sky.addColorStop(0.7, "hsl(150 40% 22%)");
       sky.addColorStop(1, "hsl(110 35% 18%)");
       ctx.fillStyle = sky;
       ctx.fillRect(0, 0, w, h);
-      // Luciérnagas verdes flotantes
       for (let i = 0; i < 14; i++) {
         const lx = (i * 157 + Math.sin(tick / 40 + i) * 35) % w;
         const ly = (i * 93 + Math.cos(tick / 35 + i) * 25) % h;
@@ -569,7 +592,6 @@ export function AntGame({
         ctx.shadowBlur = 0;
       }
     } else if (t === "noche") {
-      // Nivel 7: Noche Estrellada
       const sky = ctx.createLinearGradient(0, 0, 0, h);
       sky.addColorStop(0, "hsl(250 45% 18%)");
       sky.addColorStop(1, "hsl(230 40% 32%)");
@@ -588,14 +610,12 @@ export function AntGame({
       }
       ctx.globalAlpha = 1;
     } else if (t === "artico") {
-      // Nivel 8: Tundra Ártica
       const sky = ctx.createLinearGradient(0, 0, 0, h);
       sky.addColorStop(0, "hsl(210 60% 20%)");
       sky.addColorStop(0.4, "hsl(200 55% 40%)");
       sky.addColorStop(1, "hsl(195 70% 82%)");
       ctx.fillStyle = sky;
       ctx.fillRect(0, 0, w, h);
-      // Nieve cayendo
       for (let i = 0; i < 30; i++) {
         const sx = ((i * 193 + (tick * (0.4 + (i % 4) * 0.12))) % (w + 20)) - 10;
         const sy = ((i * 137 + tick * (0.6 + (i % 3) * 0.15)) % (h + 20)) - 10;
@@ -605,20 +625,17 @@ export function AntGame({
         ctx.fill();
       }
     } else if (t === "volcan") {
-      // Nivel 9: Volcán de Lava
       const sky = ctx.createLinearGradient(0, 0, 0, h);
       sky.addColorStop(0, "hsl(10 65% 14%)");
       sky.addColorStop(0.5, "hsl(20 75% 24%)");
       sky.addColorStop(1, "hsl(25 85% 34%)");
       ctx.fillStyle = sky;
       ctx.fillRect(0, 0, w, h);
-      // Lava en el fondo
       const lavaGrad = ctx.createLinearGradient(0, h * 0.8, 0, h);
       lavaGrad.addColorStop(0, "hsl(25 100% 50%)");
       lavaGrad.addColorStop(1, "hsl(10 100% 35%)");
       ctx.fillStyle = lavaGrad;
       ctx.fillRect(0, h * 0.82, w, h * 0.18);
-      // Brasas de fuego
       for (let i = 0; i < 18; i++) {
         const ex = (i * 97 + Math.sin(tick / 20 + i) * 20) % w;
         const ey = ((h * 0.85 - tick * (0.9 + (i % 4) * 0.2)) % h + h) % h;
@@ -628,7 +645,7 @@ export function AntGame({
         ctx.fill();
       }
     } else {
-      // Nivel 10: Cyber Glitch / Dimensión Imposible (Broma $10 USD)
+      // Nivel 10: Cyber Glitch / Dimensión Imposible
       const sky = ctx.createLinearGradient(0, 0, 0, h);
       sky.addColorStop(0, "hsl(285 85% 10%)");
       sky.addColorStop(0.5, "hsl(260 80% 16%)");
@@ -636,7 +653,6 @@ export function AntGame({
       ctx.fillStyle = sky;
       ctx.fillRect(0, 0, w, h);
 
-      // Rejilla cibernética animada en perspectiva
       ctx.strokeStyle = "hsl(310 100% 55% / 0.4)";
       ctx.lineWidth = 1.5;
       const gridY = h * 0.65;
@@ -653,26 +669,23 @@ export function AntGame({
         ctx.stroke();
       }
 
-      // Líneas de escaneo glitch
       if (Math.sin(tick / 8) > 0.4) {
         ctx.fillStyle = "hsl(180 100% 60% / 0.12)";
-        const gy = ((tick * 4) % h);
+        const gy = (tick * 4) % h;
         ctx.fillRect(0, gy, w, 6);
       }
 
-      // Texto de fondo futurista
       ctx.save();
-      ctx.font = "bold 14px monospace";
-      ctx.fillStyle = "hsl(320 100% 65% / 0.3)";
+      ctx.font = "bold 13px monospace";
+      ctx.fillStyle = "hsl(320 100% 65% / 0.35)";
       ctx.textAlign = "center";
-      ctx.fillText("⚡ NIVEL 10: VELOCIDAD IMPOSIBLE • PREMIO $10 USD ⚡", w / 2, 40);
+      ctx.fillText("⚡ NIVEL 10: 9 INSECTOS MÁS VELOCES • PREMIO $10 USD ⚡", w / 2, 40);
       ctx.restore();
     }
   };
 
   // ─── DIBUJO DE INSECTOS ───────────────────────────────────────────────────────
 
-  // 1. Oruga (Nivel 1 — La más lenta)
   const drawCaterpillar = (ctx: CanvasRenderingContext2D, p: Bug) => {
     const s = p.pop > 0 ? 1 + p.pop * 0.6 : 1;
     ctx.save();
@@ -682,7 +695,6 @@ export function AntGame({
     ctx.globalAlpha = p.pop > 0 ? Math.max(0, 1 - p.pop) : 1;
 
     const wave = Math.sin(p.d * 0.2) * 4;
-    // 4 segmentos circulares ondulantes
     for (let i = 3; i >= 0; i--) {
       const segY = i * p.r * 0.55;
       const segX = Math.sin(p.d * 0.2 + i * 0.8) * wave;
@@ -692,12 +704,10 @@ export function AntGame({
       ctx.arc(segX, segY, Math.max(4, segR), 0, Math.PI * 2);
       ctx.fill();
     }
-    // Cabeza
     ctx.fillStyle = "hsl(90 85% 40%)";
     ctx.beginPath();
     ctx.arc(0, -p.r * 0.35, p.r * 0.75, 0, Math.PI * 2);
     ctx.fill();
-    // Ojos
     ctx.fillStyle = "#fff";
     ctx.beginPath();
     ctx.arc(-p.r * 0.3, -p.r * 0.45, p.r * 0.22, 0, Math.PI * 2);
@@ -708,7 +718,6 @@ export function AntGame({
     ctx.arc(-p.r * 0.3, -p.r * 0.45, p.r * 0.11, 0, Math.PI * 2);
     ctx.arc(p.r * 0.3, -p.r * 0.45, p.r * 0.11, 0, Math.PI * 2);
     ctx.fill();
-    // Antenas
     ctx.strokeStyle = "hsl(40 90% 50%)";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
@@ -720,7 +729,6 @@ export function AntGame({
     ctx.restore();
   };
 
-  // 2. Escarabajo (Nivel 2 — Lento y blindado)
   const drawBeetle = (ctx: CanvasRenderingContext2D, p: Bug) => {
     const s = p.pop > 0 ? 1 + p.pop * 0.6 : 1;
     ctx.save();
@@ -729,7 +737,6 @@ export function AntGame({
     ctx.scale(s, s);
     ctx.globalAlpha = p.pop > 0 ? Math.max(0, 1 - p.pop) : 1;
 
-    // Patas
     ctx.strokeStyle = "hsl(145 40% 15%)";
     ctx.lineWidth = 2;
     for (let i = 0; i < 3; i++) {
@@ -741,7 +748,6 @@ export function AntGame({
         ctx.stroke();
       }
     }
-    // Caparazón esmeralda
     const elytraGrad = ctx.createRadialGradient(-p.r * 0.15, -p.r * 0.1, 0, 0, 0, p.r * 1.1);
     elytraGrad.addColorStop(0, "hsl(145 80% 55%)");
     elytraGrad.addColorStop(1, "hsl(180 60% 25%)");
@@ -749,14 +755,12 @@ export function AntGame({
     ctx.beginPath();
     ctx.ellipse(0, p.r * 0.15, p.r * 0.7, p.r * 0.95, 0, 0, Math.PI * 2);
     ctx.fill();
-    // Línea divisoria
     ctx.strokeStyle = "hsl(145 50% 20%)";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(0, -p.r * 0.7);
     ctx.lineTo(0, p.r * 1.05);
     ctx.stroke();
-    // Cabeza y mandíbulas
     ctx.fillStyle = "hsl(145 70% 30%)";
     ctx.beginPath();
     ctx.arc(0, -p.r * 0.9, p.r * 0.35, 0, Math.PI * 2);
@@ -764,7 +768,6 @@ export function AntGame({
     ctx.restore();
   };
 
-  // 3. Hormiga (Nivel 3 — Estándar)
   const drawAnt = (ctx: CanvasRenderingContext2D, p: Bug) => {
     const s = p.pop > 0 ? 1 + p.pop * 0.6 : 1;
     ctx.save();
@@ -773,7 +776,6 @@ export function AntGame({
     ctx.scale(s, s);
     ctx.globalAlpha = p.pop > 0 ? Math.max(0, 1 - p.pop) : 1;
 
-    // Patas de hormiga
     ctx.strokeStyle = "hsl(20 15% 20%)";
     ctx.lineWidth = 1.8;
     for (let i = 0; i < 3; i++) {
@@ -785,22 +787,18 @@ export function AntGame({
         ctx.stroke();
       }
     }
-    // Abdomen
     ctx.fillStyle = "hsl(20 30% 20%)";
     ctx.beginPath();
     ctx.ellipse(0, p.r * 0.65, p.r * 0.5, p.r * 0.75, 0, 0, Math.PI * 2);
     ctx.fill();
-    // Tórax
     ctx.fillStyle = "hsl(20 35% 26%)";
     ctx.beginPath();
     ctx.ellipse(0, 0, p.r * 0.35, p.r * 0.4, 0, 0, Math.PI * 2);
     ctx.fill();
-    // Cabeza
     ctx.fillStyle = "hsl(20 40% 22%)";
     ctx.beginPath();
     ctx.arc(0, -p.r * 0.65, p.r * 0.4, 0, Math.PI * 2);
     ctx.fill();
-    // Antenas
     ctx.strokeStyle = "hsl(20 20% 15%)";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
@@ -812,7 +810,6 @@ export function AntGame({
     ctx.restore();
   };
 
-  // 4. Mariquita (Nivel 4 — Velocidad media con lunares)
   const drawLadybug = (ctx: CanvasRenderingContext2D, p: Bug) => {
     const s = p.pop > 0 ? 1 + p.pop * 0.6 : 1;
     ctx.save();
@@ -821,7 +818,6 @@ export function AntGame({
     ctx.scale(s, s);
     ctx.globalAlpha = p.pop > 0 ? Math.max(0, 1 - p.pop) : 1;
 
-    // Patas
     ctx.strokeStyle = "#111";
     ctx.lineWidth = 1.8;
     for (let i = 0; i < 3; i++) {
@@ -833,19 +829,16 @@ export function AntGame({
         ctx.stroke();
       }
     }
-    // Caparazón rojo
     ctx.fillStyle = "hsl(0 85% 50%)";
     ctx.beginPath();
     ctx.ellipse(0, p.r * 0.1, p.r * 0.8, p.r * 0.85, 0, 0, Math.PI * 2);
     ctx.fill();
-    // Línea central negra
     ctx.strokeStyle = "#111";
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(0, -p.r * 0.6);
     ctx.lineTo(0, p.r * 0.9);
     ctx.stroke();
-    // Puntos negros
     ctx.fillStyle = "#111";
     const spots = [
       [-p.r * 0.4, -p.r * 0.2],
@@ -860,7 +853,6 @@ export function AntGame({
       ctx.arc(sx, sy, p.r * 0.14, 0, Math.PI * 2);
       ctx.fill();
     }
-    // Cabeza negra
     ctx.fillStyle = "#111";
     ctx.beginPath();
     ctx.arc(0, -p.r * 0.7, p.r * 0.4, 0, Math.PI * 2);
@@ -868,7 +860,6 @@ export function AntGame({
     ctx.restore();
   };
 
-  // 5. Araña (Nivel 5 — Rápida con pausas y piques)
   const drawSpider = (ctx: CanvasRenderingContext2D, p: Bug) => {
     const s = p.pop > 0 ? 1 + p.pop * 0.6 : 1;
     ctx.save();
@@ -892,7 +883,7 @@ export function AntGame({
     ctx.beginPath();
     ctx.ellipse(0, p.r * 0.65, p.r * 0.7, p.r * 0.85, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "hsl(0 80% 50%)"; // Marca roja
+    ctx.fillStyle = "hsl(0 80% 50%)";
     ctx.beginPath();
     ctx.arc(0, p.r * 0.5, p.r * 0.25, 0, Math.PI * 2);
     ctx.fill();
@@ -903,7 +894,6 @@ export function AntGame({
     ctx.restore();
   };
 
-  // 6. Abeja (Nivel 6 — Vuelo rápido orbital)
   const drawBee = (ctx: CanvasRenderingContext2D, p: Bug) => {
     const s = p.pop > 0 ? 1 + p.pop * 0.6 : 1;
     ctx.save();
@@ -912,7 +902,6 @@ export function AntGame({
     ctx.scale(s, s);
     ctx.globalAlpha = p.pop > 0 ? Math.max(0, 1 - p.pop) : 1;
 
-    // Alas que aletean
     const flutter = Math.sin(p.d * 0.5) * 0.25;
     ctx.fillStyle = "hsl(200 70% 85% / 0.6)";
     for (const side of [-1, 1]) {
@@ -920,14 +909,12 @@ export function AntGame({
       ctx.ellipse(side * p.r * 0.8, -p.r * 0.4, p.r * 0.7, p.r * 0.35, flutter * side, 0, Math.PI * 2);
       ctx.fill();
     }
-    // Rayas amarillas y negras
     for (let i = 0; i < 4; i++) {
       ctx.fillStyle = i % 2 === 0 ? "hsl(45 100% 50%)" : "hsl(0 0% 10%)";
       ctx.beginPath();
       ctx.ellipse(0, -p.r * 0.2 + i * p.r * 0.4, p.r * (0.55 - Math.abs(i - 1.5) * 0.08), p.r * 0.24, 0, 0, Math.PI * 2);
       ctx.fill();
     }
-    // Cabeza
     ctx.fillStyle = "hsl(45 80% 30%)";
     ctx.beginPath();
     ctx.arc(0, -p.r * 0.7, p.r * 0.35, 0, Math.PI * 2);
@@ -935,7 +922,6 @@ export function AntGame({
     ctx.restore();
   };
 
-  // 7. Mariposa (Nivel 7 — Rápida y zigzagueante)
   const drawButterfly = (ctx: CanvasRenderingContext2D, p: Bug) => {
     const s = p.pop > 0 ? 1 + p.pop * 0.6 : 1;
     ctx.save();
@@ -958,7 +944,6 @@ export function AntGame({
       ctx.fill();
       ctx.restore();
     }
-    // Cuerpo
     ctx.fillStyle = "hsl(280 40% 20%)";
     ctx.beginPath();
     ctx.ellipse(0, 0, p.r * 0.18, p.r * 0.7, 0, 0, Math.PI * 2);
@@ -966,7 +951,6 @@ export function AntGame({
     ctx.restore();
   };
 
-  // 8. Mosca (Nivel 8 — Muy veloz y errática)
   const drawFly = (ctx: CanvasRenderingContext2D, p: Bug) => {
     const s = p.pop > 0 ? 1 + p.pop * 0.6 : 1;
     ctx.save();
@@ -975,7 +959,6 @@ export function AntGame({
     ctx.scale(s, s);
     ctx.globalAlpha = p.pop > 0 ? Math.max(0, 1 - p.pop) : 1;
 
-    // Alas de zumbido rápido
     const flutter = Math.sin(p.d * 0.8) * 0.3;
     ctx.fillStyle = "hsl(190 70% 85% / 0.55)";
     for (const side of [-1, 1]) {
@@ -983,7 +966,6 @@ export function AntGame({
       ctx.ellipse(side * p.r * 0.75, -p.r * 0.3, p.r * 0.7, p.r * 0.28, flutter * side, 0, Math.PI * 2);
       ctx.fill();
     }
-    // Patitas
     ctx.strokeStyle = "#222";
     ctx.lineWidth = 1.4;
     for (let i = 0; i < 3; i++) {
@@ -995,12 +977,10 @@ export function AntGame({
         ctx.stroke();
       }
     }
-    // Cuerpo gris metálico
     ctx.fillStyle = "hsl(215 30% 25%)";
     ctx.beginPath();
     ctx.ellipse(0, p.r * 0.2, p.r * 0.45, p.r * 0.65, 0, 0, Math.PI * 2);
     ctx.fill();
-    // Ojos rojos gigantes compuestos
     ctx.fillStyle = "hsl(0 90% 50%)";
     ctx.beginPath();
     ctx.arc(-p.r * 0.25, -p.r * 0.45, p.r * 0.26, 0, Math.PI * 2);
@@ -1009,7 +989,6 @@ export function AntGame({
     ctx.restore();
   };
 
-  // 9. Avispa (Nivel 9 — Súper veloz y afilada)
   const drawWasp = (ctx: CanvasRenderingContext2D, p: Bug) => {
     const s = p.pop > 0 ? 1 + p.pop * 0.6 : 1;
     ctx.save();
@@ -1018,25 +997,21 @@ export function AntGame({
     ctx.scale(s, s);
     ctx.globalAlpha = p.pop > 0 ? Math.max(0, 1 - p.pop) : 1;
 
-    // Alas alargadas
     ctx.fillStyle = "hsl(40 80% 85% / 0.6)";
     for (const side of [-1, 1]) {
       ctx.beginPath();
       ctx.ellipse(side * p.r * 0.85, -p.r * 0.45, p.r * 0.85, p.r * 0.25, side * 0.4, 0, Math.PI * 2);
       ctx.fill();
     }
-    // Abdomen puntiagudo con aguijón
     ctx.fillStyle = "hsl(52 100% 50%)";
     ctx.beginPath();
-    ctx.moveTo(0, p.r * 1.1); // aguijón
+    ctx.moveTo(0, p.r * 1.1);
     ctx.lineTo(-p.r * 0.4, p.r * 0.3);
     ctx.lineTo(p.r * 0.4, p.r * 0.3);
     ctx.closePath();
     ctx.fill();
-    // Rayas negras en aguijón
     ctx.fillStyle = "#111";
     ctx.fillRect(-p.r * 0.3, p.r * 0.5, p.r * 0.6, p.r * 0.18);
-    // Tórax y cabeza
     ctx.fillStyle = "#111";
     ctx.beginPath();
     ctx.ellipse(0, 0, p.r * 0.35, p.r * 0.35, 0, 0, Math.PI * 2);
@@ -1045,7 +1020,6 @@ export function AntGame({
     ctx.restore();
   };
 
-  // 10. Mosquito (Nivel 10 — Hipervelocidad imposible)
   const drawMosquito = (ctx: CanvasRenderingContext2D, p: Bug) => {
     const s = p.pop > 0 ? 1 + p.pop * 0.6 : 1;
     ctx.save();
@@ -1054,13 +1028,11 @@ export function AntGame({
     ctx.scale(s, s);
     ctx.globalAlpha = p.pop > 0 ? Math.max(0, 1 - p.pop) : 1;
 
-    // Resplandor de hipervelocidad en nivel 10
     if (levelRef.current >= 10 || scoreRef.current >= 900) {
       ctx.shadowColor = "hsl(180 100% 60%)";
-      ctx.shadowBlur = 12;
+      ctx.shadowBlur = 10;
     }
 
-    // Patas finas y larguísimas
     ctx.strokeStyle = "hsl(200 20% 25%)";
     ctx.lineWidth = 1.2;
     for (let i = 0; i < 3; i++) {
@@ -1072,7 +1044,6 @@ export function AntGame({
         ctx.stroke();
       }
     }
-    // Alas difusas por altísima vibración
     const flutter = Math.sin(p.d * 1.5) * 0.4;
     ctx.fillStyle = "hsl(190 80% 85% / 0.45)";
     for (const side of [-1, 1]) {
@@ -1080,17 +1051,14 @@ export function AntGame({
       ctx.ellipse(side * p.r * 0.7, -p.r * 0.3, p.r * 0.8, p.r * 0.2, flutter * side, 0, Math.PI * 2);
       ctx.fill();
     }
-    // Cuerpo alargado fino
     ctx.fillStyle = "hsl(200 15% 20%)";
     ctx.beginPath();
     ctx.ellipse(0, p.r * 0.2, p.r * 0.18, p.r * 0.7, 0, 0, Math.PI * 2);
     ctx.fill();
-    // Cabeza con aguja picadora larga
     ctx.fillStyle = "#111";
     ctx.beginPath();
     ctx.arc(0, -p.r * 0.5, p.r * 0.22, 0, Math.PI * 2);
     ctx.fill();
-    // Trompa/aguja
     ctx.strokeStyle = "hsl(0 80% 45%)";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
@@ -1148,7 +1116,6 @@ export function AntGame({
         return;
       }
       case "dorado": {
-        // Bicho dorado resplandeciente
         const s = p.pop > 0 ? 1 + p.pop * 0.6 : 1;
         ctx.save();
         ctx.translate(p.x, p.y);
@@ -1182,7 +1149,6 @@ export function AntGame({
         ctx.beginPath();
         ctx.ellipse(0, 0, p.r * 0.7, p.r * 0.95, 0, 0, Math.PI * 2);
         ctx.fill();
-        // Corona de jefe
         ctx.font = `${p.r * 0.9}px sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -1248,12 +1214,13 @@ export function AntGame({
         spawnTimerRef.current += 1 / 60;
         const lvl = levelRef.current;
         const isLevel10 = lvl >= 10 || scoreRef.current >= 900;
-        // Intervalo de spawn: en nivel 10 es más lento para tener solo unos cuantos dispersos
-        const targetInterval = isLevel10 ? 1.8 : Math.max(0.65, 2.0 - lvl * 0.12);
+        const maxBugs = isLevel10 ? 9 : (MAX_BUGS_PER_LEVEL[lvl] ?? 9);
+        const aliveCount = bugsRef.current.filter((b) => b.alive).length;
 
-        if (spawnTimerRef.current > targetInterval) {
+        // Mantener la cantidad de insectos requerida según el nivel
+        if (aliveCount < maxBugs && spawnTimerRef.current > 0.4) {
           spawnTimerRef.current = 0;
-          spawn(w, h, isLevel10 ? 1 : Math.min(3, 1 + Math.floor(lvl / 3)));
+          spawn(w, h, maxBugs - aliveCount);
         }
 
         // Jefe en niveles 3, 6, 9
@@ -1266,7 +1233,7 @@ export function AntGame({
         }
 
         powerUpTimerRef.current += 1 / 60;
-        if (powerUpTimerRef.current > 9 + Math.random() * 8) {
+        if (powerUpTimerRef.current > 10 + Math.random() * 8) {
           powerUpTimerRef.current = 0;
           if (powerUpsRef.current.length < 2 && !isLevel10) spawnPowerUp(w, h);
         }
@@ -1303,7 +1270,6 @@ export function AntGame({
             p.x += p.v * Math.sin(p.a) * speedMul + Math.cos(p.orbitAngle) * 1.4 * speedMul;
             p.y -= p.v * Math.cos(p.a) * speedMul + Math.sin(p.orbitAngle) * 1.4 * speedMul;
           } else if (p.kind === "mosquito") {
-            // Zumbido hiper-rápido en zigzag con cambios violentos
             p.a += (Math.random() * 2 - 1) * 0.35;
             p.x += p.v * Math.sin(p.a) * speedMul;
             p.y -= p.v * Math.cos(p.a) * speedMul;
@@ -1316,7 +1282,6 @@ export function AntGame({
 
           p.d += p.v * speedMul;
 
-          // Rebote en bordes de pantalla
           if (p.x < -25) p.a = Math.PI / 2 + (Math.random() - 0.5);
           if (p.x > w + 25) p.a = -Math.PI / 2 + (Math.random() - 0.5);
           if (p.y < -25) p.a = Math.PI + (Math.random() - 0.5);
@@ -1333,7 +1298,6 @@ export function AntGame({
         if (p.alive) drawPowerUp(ctx, p);
       }
 
-      // Partículas
       for (const pt of particlesRef.current) {
         if (playing || pt.life < 1) {
           pt.x += pt.vx;
@@ -1353,7 +1317,6 @@ export function AntGame({
       }
       particlesRef.current = particlesRef.current.filter((pt) => pt.life > 0);
 
-      // Flotadores de puntos
       for (const f of floatersRef.current) {
         if (playing || f.life < 1) {
           f.y += f.dy;
@@ -1372,7 +1335,7 @@ export function AntGame({
     };
   }, [spawn, spawnBoss, spawnPowerUp, timeLeft]);
 
-  // ─── MANEJO DE TOQUES CON MECÁNICA DE BROMA (NIVEL 10 / 900+ PTS) ─────────────
+  // ─── MANEJO DE TOQUES: PERMITE AVANZAR HASTA 999 PUNTOS MÁXIMO ───────────────
 
   const tap = (clientX: number, clientY: number) => {
     const cv = canvasRef.current;
@@ -1407,44 +1370,6 @@ export function AntGame({
       return;
     }
 
-    // MECÁNICA DE ESQUIVA EN NIVEL 10 (900+ PUNTOS)
-    // Los insectos esquivan automáticamente cuando intentas tocarlos
-    let anyDodged = false;
-    if (isLevel10) {
-      for (const p of bugsRef.current) {
-        if (!p.alive || p.kind === "bomba") continue;
-        const dist = Math.hypot(p.x - x, p.y - y);
-        if (dist < 130) {
-          // El mosquito o insecto esquiva a la velocidad de la luz
-          const angle = Math.atan2(p.y - y, p.x - x) + (Math.random() - 0.5);
-          p.x += Math.cos(angle) * (140 + Math.random() * 120);
-          p.y += Math.sin(angle) * (140 + Math.random() * 120);
-          p.v = Math.max(p.v, 6.5);
-          burst(x, y, 180, 10);
-          sfx.dodge();
-          anyDodged = true;
-          const jokeTexts = [
-            "¡ESQUIVADO! 💨",
-            "¡MUY LENTO! ⚡",
-            "¡CASI! 🏃💨",
-            "¡A 1 PTO DE LOS $10! 💸",
-            "¡NI DE CHISTE! 🦟",
-          ];
-          addFloater(
-            x,
-            y - 15,
-            jokeTexts[Math.floor(Math.random() * jokeTexts.length)] ?? "¡ESQUIVADO! 💨",
-            "oklch(0.7 0.25 180)",
-          );
-        }
-      }
-      if (anyDodged) {
-        statsRef.current.missed += 1;
-        statsRef.current.dodges = (statsRef.current.dodges ?? 0) + 1;
-        return;
-      }
-    }
-
     let hits = 0;
     let gained = 0;
     let bombHit = false;
@@ -1453,17 +1378,20 @@ export function AntGame({
     for (const p of bugsRef.current) {
       if (!p.alive) continue;
       const dist = Math.hypot(p.x - x, p.y - y);
+
+      // Hitbox según tipo de insecto
       const hitMul =
         p.kind === "mosquito"
-          ? 1.3
-          : p.kind === "mariposa" || p.kind === "mosca"
-            ? 1.6
+          ? 1.6
+          : p.kind === "mariposa" || p.kind === "mosca" || p.kind === "avispa"
+            ? 1.8
             : p.kind === "araña"
-              ? 2.5
+              ? 2.4
               : p.kind === "escarabajo" || p.kind === "oruga"
-                ? 2.2
+                ? 2.3
                 : 2.0;
 
+      // IMPACTO DIRECTO: SI EL USUARIO TOCA AL INSECTO, SÍ SE ATRAPA (AVANZA PUNTOS HASTA 999)
       if (dist < p.r * hitMul) {
         if (p.kind === "bomba") {
           p.alive = false;
@@ -1490,10 +1418,21 @@ export function AntGame({
           bossKilled = true;
         }
         burst(p.x, p.y, p.hue, p.kind === "jefe" ? 26 : 14);
-      } else if (dist < 140 && p.kind !== "bomba") {
-        // Asustar insectos cercanos
-        p.v = Math.min(8, p.v * 1.5);
-        p.a = Math.atan2(p.x - x, y - p.y) + (Math.random() - 0.5);
+      } else if (dist < 110 && p.kind !== "bomba") {
+        // TOQUE CERCANO PERO NO DIRECTO:
+        // En nivel 10, si tocas cerca pero no le das, el insecto reacciona y esquiva
+        if (isLevel10) {
+          const angle = Math.atan2(p.y - y, p.x - x) + (Math.random() - 0.5);
+          p.x += Math.cos(angle) * (90 + Math.random() * 80);
+          p.y += Math.sin(angle) * (90 + Math.random() * 80);
+          p.v = Math.min(8, p.v * 1.3);
+          burst(p.x, p.y, 180, 5);
+          sfx.dodge();
+          addFloater(x, y - 10, "¡ESQUIVADO! 💨", "oklch(0.7 0.25 180)");
+        } else {
+          p.v = Math.min(7, p.v * 1.4);
+          p.a = Math.atan2(p.x - x, y - p.y) + (Math.random() - 0.5);
+        }
       }
     }
 
@@ -1527,7 +1466,7 @@ export function AntGame({
       const comboMul = 1 + (comboRef.current - 1) * 0.5;
       gained = Math.round(gained * comboMul * double);
 
-      // TRUCO DE LA BROMA: La puntuación máxima permitida en el juego es estrictamente 999 puntos
+      // TRUCO DE LA BROMA: LA PUNTUACIÓN AVANZA NORMALMENTE HASTA UN MÁXIMO ESTRICTO DE 999 PUNTOS
       const currentScore = scoreRef.current;
       if (currentScore >= 999) {
         addFloater(x, y - 20, "¡999 MÁXIMO! 😂", "oklch(0.7 0.25 40)");
@@ -1540,14 +1479,15 @@ export function AntGame({
 
       addFloater(x, y - 20, `+${cappedGained}`, "oklch(0.65 0.2 30)");
       if (currentScore + cappedGained >= 999) {
-        addFloater(x, y - 55, "¡¡CASI 1000!! 😱", "oklch(0.7 0.25 40)");
+        addFloater(x, y - 55, "¡¡999 PUNTOS ALCANZADOS!! 😱", "oklch(0.7 0.25 40)");
+        addFloater(x, y - 85, "¡A 1 PUNTO DE LOS $10! 💸", "oklch(0.8 0.22 85)");
       }
       if (bossKilled) addFloater(x, y - 80, "¡JEFE ATRAPADO! 👑", "oklch(0.7 0.2 350)");
       if (comboRef.current > 1) {
         addFloater(x, y - 50, `Combo x${comboRef.current}`, "oklch(0.7 0.18 300)");
       }
 
-      spawn(cv.clientWidth, cv.clientHeight, isLevel10 ? 1 : hits + 1);
+      spawn(cv.clientWidth, cv.clientHeight, hits);
     } else if (!bombHit) {
       if (comboRef.current > 1) {
         addFloater(x, y, "¡Combo perdido!", "oklch(0.55 0.15 25)");

@@ -2,7 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AntGame,
-  GAME_SECONDS,
+  getSecondsForLevel,
+  LEVEL_SECONDS,
+  MAX_BUGS_PER_LEVEL,
   type GameState,
   type GameStats,
   type Theme,
@@ -19,7 +21,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Juego web arcade de reflejos: supera los 10 niveles, atrapa insectos cada vez más veloces y compite por el récord de 1000 puntos creado por C7Dev_.",
+          "Juego web arcade de reflejos: supera los 10 niveles con tiempo decreciente, atrapa insectos cada vez más veloces y compite por el récord de 1000 puntos creado por C7Dev_.",
       },
       { property: "og:title", content: "Atrapa Bichos — Desafío 10 Niveles por C7Dev_" },
       {
@@ -101,6 +103,7 @@ const ACHIEVEMENTS: Achievement[] = [
   { id: "level5", icon: "🚀", name: "Mitad de camino", desc: "Llega al nivel 5 (Bosque Encantado)", test: ({ level }) => level >= 5 },
   { id: "level10", icon: "⚡", name: "Dimensión Imposible", desc: "Llega al nivel 10 (900+ puntos)", test: ({ level }) => level >= 10 },
   { id: "near1000", icon: "💸", name: "A un pelo de los $10", desc: "Llega a 900+ puntos (a punto de ganar $10 USD)", test: ({ score }) => score >= 900 },
+  { id: "max999", icon: "🏆", name: "Leyenda 999", desc: "Alcanza la puntuación máxima de 999 puntos", test: ({ score }) => score >= 999 },
 ];
 
 function missionKey() {
@@ -173,7 +176,7 @@ function Index() {
   const [state, setState] = useState<GameState>("idle");
   const [paused, setPaused] = useState(false);
   const [score, setScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(GAME_SECONDS);
+  const [timeLeft, setTimeLeft] = useState(getSecondsForLevel(1)); // Nivel 1: 45s
   const [best, setBest] = useState(0);
   const [combo, setCombo] = useState(0);
   const [stats, setStats] = useState<GameStats>({ ...EMPTY_STATS });
@@ -239,12 +242,13 @@ function Index() {
     return () => window.clearInterval(timer);
   }, [showAdModal, adCountdown]);
 
-  // REGLA: Cada nivel tiene 45 segundos para superar mientras obtienes los puntos
-  // Cuando subes de nivel (cada 100 puntos), el temporizador se reinicia a 45 segundos
+  // REGLA: TIEMPO DECRECIENTE POR NIVEL
+  // Nivel 1: 45s, Nivel 2: 43s, Nivel 3: 41s ... Nivel 10: 25s
   useEffect(() => {
     if (state === "playing" && level > prevLevelRef.current) {
-      setTimeLeft(GAME_SECONDS);
-      pushToast(`🚀 ¡NIVEL ${level}! ${THEME_ICONS[theme]} ${THEME_NAMES[theme]} (+45s)`);
+      const nextSeconds = getSecondsForLevel(level);
+      setTimeLeft(nextSeconds);
+      pushToast(`🚀 ¡NIVEL ${level}! ${THEME_ICONS[theme]} ${THEME_NAMES[theme]} (+${nextSeconds}s ⏱️)`);
       sfx.levelUp();
       setConfetti(true);
       window.setTimeout(() => setConfetti(false), 2400);
@@ -317,7 +321,7 @@ function Index() {
   const start = () => {
     ensureAudio();
     setScore(0);
-    setTimeLeft(GAME_SECONDS);
+    setTimeLeft(getSecondsForLevel(1)); // 45 segundos para el Nivel 1
     setCombo(0);
     setPaused(false);
     setStats({ ...EMPTY_STATS });
@@ -335,6 +339,7 @@ function Index() {
     sfx.cash();
   };
 
+  // La puntuación avanza libremente hasta el máximo absoluto de 999 puntos
   const onScore = useCallback((n: number) => setScore((s) => Math.min(999, Math.max(0, s + n))), []);
   const onTick = useCallback((d: number) => setTimeLeft((t) => Math.max(0, t + d)), []);
   const onComboChange = useCallback((c: number) => setCombo(c), []);
@@ -376,9 +381,11 @@ function Index() {
 
   // Compartir en Redes Sociales
   const shareText =
-    score >= 900
-      ? `¡Casi gano los $10 USD! Hice ${score} puntos en Atrapa Bichos de @C7Dev-77 y estuve a solo ${Math.max(1, 1000 - score)} punto de cobrar 😱💸 ¿Podrás superarme?`
-      : `¡Hice ${score} puntos en Atrapa Bichos de @C7Dev-77 y llegué al Nivel ${level} (${THEME_NAMES[theme]})! 🦟🎯 ¿Puedes superarme?`;
+    score === 999
+      ? `¡INCREÍBLE! Logré 999 PUNTOS (Puntuación Máxima) en Atrapa Bichos de @C7Dev-77 y estuve a solo 1 punto de ganar los $10 USD 😱💸 ¿Podrás igualarme?`
+      : score >= 900
+        ? `¡Casi gano los $10 USD! Hice ${score} puntos en Atrapa Bichos de @C7Dev-77 en el Nivel 10 (solo 9 insectos ultra rápidos) 😱💸 ¿Podrás superarme?`
+        : `¡Hice ${score} puntos en Atrapa Bichos de @C7Dev-77 y llegué al Nivel ${level} (${THEME_NAMES[theme]})! 🦟🎯 ¿Puedes superarme?`;
 
   const shareOnTwitter = () => {
     const url = typeof window !== "undefined" ? window.location.origin : "https://atrapa-bichos.vercel.app";
@@ -460,10 +467,10 @@ function Index() {
             )}
           </div>
 
-          {/* Temporizador de nivel (45s por nivel) */}
-          <div className={`rounded-2xl sm:rounded-3xl px-4 py-2 sm:px-5 sm:py-3 text-right shadow-toy backdrop-blur-sm border transition-colors ${timeLeft <= 10 ? "bg-destructive/90 text-destructive-foreground border-destructive animate-pulse" : "bg-card/90 border-border/50"}`}>
+          {/* Temporizador de nivel con tiempo reducido por nivel */}
+          <div className={`rounded-2xl sm:rounded-3xl px-4 py-2 sm:px-5 sm:py-3 text-right shadow-toy backdrop-blur-sm border transition-colors ${timeLeft <= 8 ? "bg-destructive/90 text-destructive-foreground border-destructive animate-pulse" : "bg-card/90 border-border/50"}`}>
             <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest opacity-80">
-              Tiempo Nivel {level}
+              Tiempo Nivel {level} ({getSecondsForLevel(level)}s)
             </p>
             <p className="font-display text-3xl sm:text-4xl leading-none">{timeLeft}s</p>
           </div>
@@ -529,7 +536,7 @@ function Index() {
 
             {/* Badge publicitario oficial */}
             <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/20 px-4 py-1 text-xs font-extrabold uppercase tracking-widest text-amber-400 border border-amber-400/30">
-              💰 PROMOCIÓN ESPECIAL DE C7Dev_
+              💰 DESAFÍO OFICIAL C7Dev_
             </div>
 
             {/* Título de alto impacto */}
@@ -541,32 +548,32 @@ function Index() {
             </h2>
 
             <p className="mt-2 text-sm sm:text-base text-foreground font-medium leading-relaxed">
-              ¿Tienes la puntería y velocidad necesarias? Supera los 10 niveles antes de que acabe el tiempo de 45 segundos y acumula 1,000 puntos para ganar <strong>$10 dólares en efectivo</strong>.
+              Supera los 10 niveles y acumula 1,000 puntos para ganar <strong>$10 dólares en efectivo</strong> transferidos al instante.
             </p>
 
-            {/* Detalles del desafío */}
+            {/* Detalles del desafío con las nuevas reglas */}
             <div className="mt-4 grid grid-cols-2 gap-2 text-left text-xs sm:text-sm">
               <div className="rounded-2xl bg-muted/80 p-3 border border-border/60">
-                <p className="font-bold text-amber-400">⚡ 10 Niveles</p>
-                <p className="text-muted-foreground text-xs mt-0.5">Insectos cada vez más rápidos</p>
+                <p className="font-bold text-amber-400">⏱️ Tiempo Decreciente</p>
+                <p className="text-muted-foreground text-xs mt-0.5">L1: 45s • L2: 43s ... L10: 25s</p>
               </div>
               <div className="rounded-2xl bg-muted/80 p-3 border border-border/60">
-                <p className="font-bold text-amber-400">⏱️ 45s por Nivel</p>
-                <p className="text-muted-foreground text-xs mt-0.5">El tiempo se reinicia al subir</p>
+                <p className="font-bold text-amber-400">🦗 Menos Insectos</p>
+                <p className="text-muted-foreground text-xs mt-0.5">Las especies lentas desaparecen</p>
               </div>
               <div className="rounded-2xl bg-muted/80 p-3 border border-border/60">
-                <p className="font-bold text-amber-400">🦟 Nivel 10 Épico</p>
-                <p className="text-muted-foreground text-xs mt-0.5">Los mosquitos rompen el sonido</p>
+                <p className="font-bold text-amber-400">⚡ Nivel 10 Épico</p>
+                <p className="text-muted-foreground text-xs mt-0.5">Solo 9 bichos de las 3 razas top</p>
               </div>
               <div className="rounded-2xl bg-muted/80 p-3 border border-border/60">
-                <p className="font-bold text-amber-400">💸 Pago Inmediato</p>
-                <p className="text-muted-foreground text-xs mt-0.5">¡Si logras los 1,000 puntos!</p>
+                <p className="font-bold text-amber-400">💸 Puntuación Máxima</p>
+                <p className="text-muted-foreground text-xs mt-0.5">¡Llega hasta 999 pts!</p>
               </div>
             </div>
 
             {/* Letra pequeña de la broma */}
             <p className="mt-3 text-[11px] text-muted-foreground/80 italic">
-              * Promoción válida para todos los jugadores. Sujeto a disponibilidad de insectos en el nivel 10.
+              * Promoción válida para todos los jugadores. Sujeto a disponibilidad del cajero al alcanzar 1,000 pts.
             </p>
 
             {/* Botón CTA con cuenta atrás */}
@@ -576,7 +583,7 @@ function Index() {
                 setShowAdModal(false);
                 start();
               }}
-              className="mt-5 w-full rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 px-6 py-4 font-display text-xl text-zinc-950 font-bold shadow-toy transition-transform active:scale-95 hover:brightness-110 flex items-center justify-center gap-2"
+              className="mt-5 w-full rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 px-6 py-4 font-display text-xl text-zinc-950 font-bold shadow-toy transition-transform active:scale-95 hover:brightness-110 flex items-center justify-center gap-2 cursor-pointer"
             >
               {adCountdown > 0 ? (
                 <>⏳ Comenzar Desafío ({adCountdown}s)...</>
@@ -608,7 +615,7 @@ function Index() {
               {state === "idle" ? "¡Atrapa Bichos!" : "¡Tiempo Agotado!"}
             </h1>
 
-            {/* MENSAJE DE LA BROMA CUANDO TE QUEDAS A 1 PUNTO DE LOS $10 USD (900 - 999 pts) */}
+            {/* MENSAJE DE LA BROMA CUANDO TE QUEDAS EN 999 PUNTOS O EN EL NIVEL 10 */}
             {state === "over" && score >= 900 ? (
               <div className="mt-3 rounded-2xl bg-amber-500/15 p-4 border-2 border-amber-400 text-left animate-enter">
                 <div className="flex items-center gap-2">
@@ -616,20 +623,24 @@ function Index() {
                   <div>
                     <p className="font-display text-xl text-amber-400">
                       {score === 999
-                        ? "¡¡A SOLO 1 PUNTO DE LOS $10 USD!!"
+                        ? "¡¡999 PUNTOS!! A SOLO 1 PUNTO DE LOS $10 USD"
                         : `¡¡A ${1000 - score} PUNTOS DE LOS $10 USD!!`}
                     </p>
-                    <p className="text-xs text-muted-foreground">Te quedaste en {score}/1,000 puntos</p>
+                    <p className="text-xs text-muted-foreground">
+                      Lograste {score}/1,000 puntos {score === 999 && "🏆 (PUNTUACIÓN MÁXIMA)"}
+                    </p>
                   </div>
                 </div>
                 <p className="mt-2 text-xs sm:text-sm text-foreground leading-snug">
-                  Los mosquitos del Nivel 10 eran demasiado rápidos... y además el servidor de pagos de <strong>C7Dev_</strong> está temporalmente fuera de servicio por mantenimiento 😂 ¡Comparte tu récord y reta a tus amigos!
+                  {score === 999
+                    ? "¡Increíble reflejo! Lograste 999 puntos, el límite absoluto del juego. Estuviste a solo 1 punto de cobrar tus $10 USD... pero el cajero de C7Dev_ se quedó sin cambio 😂 ¡Comparte tu récord mundial!"
+                    : "Los 9 insectos del Nivel 10 (Moscas, Avispas y Mosquitos) eran demasiado veloces... y el servidor de pagos de C7Dev_ está temporalmente en mantenimiento 😂 ¡Comparte tu puntuación!"}
                 </p>
               </div>
             ) : (
               <p className="mt-3 text-base sm:text-lg text-muted-foreground">
                 {state === "idle"
-                  ? "10 Niveles, 45 segundos por nivel. Toca los insectos según su velocidad y batiendo récords."
+                  ? "10 Niveles con tiempo decreciente (45s a 25s). Cada nivel tiene menos insectos y más rápidos."
                   : `Atrapaste ${stats.caught} bichos y alcanzaste el Nivel ${level} (${THEME_NAMES[theme]}).`}
               </p>
             )}
@@ -663,19 +674,19 @@ function Index() {
                   <div className="flex justify-center gap-2">
                     <button
                       onClick={shareOnWhatsApp}
-                      className="flex-1 rounded-full bg-[#25D366] px-3 py-2 text-xs font-bold text-white shadow-toy transition-transform active:scale-95 flex items-center justify-center gap-1"
+                      className="flex-1 rounded-full bg-[#25D366] px-3 py-2 text-xs font-bold text-white shadow-toy transition-transform active:scale-95 flex items-center justify-center gap-1 cursor-pointer"
                     >
                       💬 WhatsApp
                     </button>
                     <button
                       onClick={shareOnTwitter}
-                      className="flex-1 rounded-full bg-zinc-900 px-3 py-2 text-xs font-bold text-white shadow-toy transition-transform active:scale-95 flex items-center justify-center gap-1 border border-zinc-700"
+                      className="flex-1 rounded-full bg-zinc-900 px-3 py-2 text-xs font-bold text-white shadow-toy transition-transform active:scale-95 flex items-center justify-center gap-1 border border-zinc-700 cursor-pointer"
                     >
                       𝕏 Twitter
                     </button>
                     <button
                       onClick={copyShareLink}
-                      className="rounded-full bg-primary/20 px-3 py-2 text-xs font-bold text-primary transition-transform active:scale-95 hover:bg-primary/30"
+                      className="rounded-full bg-primary/20 px-3 py-2 text-xs font-bold text-primary transition-transform active:scale-95 hover:bg-primary/30 cursor-pointer"
                       title="Copiar texto y enlace"
                     >
                       📋 Copiar
@@ -736,18 +747,21 @@ function Index() {
               <>
                 {/* Insectos por velocidad */}
                 <div className="mt-3 rounded-2xl bg-muted/60 p-3 text-left border border-border/50">
-                  <p className="text-xs font-bold text-foreground mb-1.5">🦗 Insectos ordenados por velocidad:</p>
-                  <div className="flex flex-wrap gap-1 text-[11px] text-muted-foreground">
-                    <span className="rounded-md bg-background px-2 py-0.5">1. Oruga 🐛 (lenta)</span>
-                    <span className="rounded-md bg-background px-2 py-0.5">2. Escarabajo 🪲</span>
-                    <span className="rounded-md bg-background px-2 py-0.5">3. Hormiga 🐜</span>
-                    <span className="rounded-md bg-background px-2 py-0.5">4. Mariquita 🐞</span>
-                    <span className="rounded-md bg-background px-2 py-0.5">5. Araña 🕷️</span>
-                    <span className="rounded-md bg-background px-2 py-0.5">6. Abeja 🐝</span>
-                    <span className="rounded-md bg-background px-2 py-0.5">7. Mariposa 🦋</span>
-                    <span className="rounded-md bg-background px-2 py-0.5">8. Mosca 🪰</span>
-                    <span className="rounded-md bg-background px-2 py-0.5">9. Avispa 🐝</span>
-                    <span className="rounded-md bg-amber-400/20 text-amber-500 font-bold px-2 py-0.5">10. Mosquito 🦟 (imposible)</span>
+                  <p className="text-xs font-bold text-foreground mb-1">🦗 Desaparición de bichos lentos:</p>
+                  <p className="text-[11px] text-muted-foreground mb-2">
+                    A medida que subes de nivel, las especies lentas desaparecen. En el <strong>Nivel 10</strong> solo hay <strong>9 insectos</strong> (3 Moscas, 3 Avispas y 3 Mosquitos).
+                  </p>
+                  <div className="flex flex-wrap gap-1 text-[10px] text-muted-foreground">
+                    <span className="rounded-md bg-background px-1.5 py-0.5">L1-2: 🐛 Oruga</span>
+                    <span className="rounded-md bg-background px-1.5 py-0.5">L1-3: 🪲 Escarabajo</span>
+                    <span className="rounded-md bg-background px-1.5 py-0.5">L2-4: 🐜 Hormiga</span>
+                    <span className="rounded-md bg-background px-1.5 py-0.5">L3-5: 🐞 Mariquita</span>
+                    <span className="rounded-md bg-background px-1.5 py-0.5">L4-6: 🕷️ Araña</span>
+                    <span className="rounded-md bg-background px-1.5 py-0.5">L5-7: 🐝 Abeja</span>
+                    <span className="rounded-md bg-background px-1.5 py-0.5">L6-8: 🦋 Mariposa</span>
+                    <span className="rounded-md bg-background px-1.5 py-0.5 font-bold text-foreground">L7-10: 🪰 Mosca</span>
+                    <span className="rounded-md bg-background px-1.5 py-0.5 font-bold text-foreground">L8-10: 🐝 Avispa</span>
+                    <span className="rounded-md bg-amber-400/20 text-amber-500 font-bold px-1.5 py-0.5">L9-10: 🦟 Mosquito</span>
                   </div>
                 </div>
 
@@ -780,7 +794,7 @@ function Index() {
             <button
               id="btn-play"
               onClick={start}
-              className="mt-5 w-full rounded-full bg-primary px-8 py-4 font-display text-2xl text-primary-foreground shadow-toy transition-transform active:scale-95 hover:brightness-110"
+              className="mt-5 w-full rounded-full bg-primary px-8 py-4 font-display text-2xl text-primary-foreground shadow-toy transition-transform active:scale-95 hover:brightness-110 cursor-pointer"
             >
               {state === "idle" ? "¡Jugar Ahora!" : "Intentar otra vez"}
             </button>
@@ -864,7 +878,7 @@ function Index() {
             <button
               id="btn-close-board"
               onClick={() => setShowBoard(false)}
-              className="mt-4 w-full rounded-full bg-primary px-6 py-3 font-display text-xl text-primary-foreground shadow-toy transition-transform active:scale-95"
+              className="mt-4 w-full rounded-full bg-primary px-6 py-3 font-display text-xl text-primary-foreground shadow-toy transition-transform active:scale-95 cursor-pointer"
             >
               Cerrar
             </button>
@@ -899,7 +913,7 @@ function Index() {
             <button
               id="btn-close-achievements"
               onClick={() => setShowAchievements(false)}
-              className="mt-4 w-full rounded-full bg-primary px-6 py-3 font-display text-xl text-primary-foreground shadow-toy transition-transform active:scale-95"
+              className="mt-4 w-full rounded-full bg-primary px-6 py-3 font-display text-xl text-primary-foreground shadow-toy transition-transform active:scale-95 cursor-pointer"
             >
               Cerrar
             </button>
