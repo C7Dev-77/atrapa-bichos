@@ -151,6 +151,7 @@ function useGlobalBoard() {
       const result = await fetchGlobalScores();
       if (!result.ok) throw new Error("not ok");
       setRows(result.scores ?? []);
+      setAvailable(true);
     } catch {
       setAvailable(false);
     } finally {
@@ -361,8 +362,7 @@ function Index() {
   const accuracy =
     stats.caught + stats.missed > 0 ? Math.round((stats.caught / (stats.caught + stats.missed)) * 100) : 0;
 
-  const qualifies =
-    score > 0 && (board.length < 10 || score > (board[board.length - 1]?.score ?? 0));
+  const qualifies = score > 0;
 
   const GAME_URL = "https://atrapa-bichos.vercel.app";
 
@@ -373,6 +373,8 @@ function Index() {
     localStorage.setItem("ab-board", JSON.stringify(next));
     setBoardSaved(true);
     await postScore(name, score);
+    await globalBoard.fetch();
+    pushToast("✅ ¡Puntaje guardado en el Ranking Global!");
   };
 
   const openBoard = (tab: "local" | "global") => {
@@ -854,7 +856,7 @@ function Index() {
                 id="tab-global"
                 onClick={() => {
                   setBoardTab("global");
-                  if (globalBoard.rows.length === 0) globalBoard.fetch();
+                  globalBoard.fetch();
                 }}
                 className={`flex-1 py-2 font-bold text-sm transition-colors ${boardTab === "global" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
               >

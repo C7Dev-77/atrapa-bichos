@@ -17,7 +17,27 @@ type SqlClient = {
 let _client: SqlClient | null | "pending" = "pending";
 
 async function getClient(): Promise<SqlClient | null> {
-  if (_client !== "pending") return _client;
+  if (_client !== "pending" && _client !== null) return _client;
+
+  // In local development, read .env.local if present
+  if (typeof process !== "undefined" && process.cwd) {
+    try {
+      const fs = await import("fs");
+      const path = await import("path");
+      const envPath = path.resolve(process.cwd(), ".env.local");
+      if (fs.existsSync(envPath)) {
+        const content = fs.readFileSync(envPath, "utf-8");
+        for (const line of content.split("\n")) {
+          const match = line.match(/^\s*([\w]+)\s*=\s*["']?(.*?)["']?\s*$/);
+          if (match && match[1] && match[2] && !process.env[match[1]]) {
+            process.env[match[1]] = match[2];
+          }
+        }
+      }
+    } catch {
+      // Ignored in serverless/browser
+    }
+  }
 
   const conn =
     process.env["POSTGRES_URL"] ||
@@ -104,14 +124,16 @@ export async function upsertScore(uuid: string, name: string, score: number): Pr
   const db = await getClient();
   if (!db) return;
 
+  const cleanName = name.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 5) || "CRIST";
+
   await db.sql`
     INSERT INTO scores (uuid, name, score)
-    VALUES (${uuid}, ${name.toUpperCase().slice(0, 3)}, ${score})
+    VALUES (${uuid}, ${cleanName}, ${score})
     ON CONFLICT (uuid)
     DO UPDATE SET
       name  = EXCLUDED.name,
       score = EXCLUDED.score
-    WHERE EXCLUDED.score > scores.score
+    WHERE EXCLUDED.score >= scores.score
   `;
 }
 
