@@ -5,6 +5,7 @@
 ![TanStack](https://img.shields.io/badge/TanStack_Start-FF4154?style=flat-square&logo=react-query&logoColor=white)
 ![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-000000?style=flat-square&logo=vercel&logoColor=white)
+![Versión](https://img.shields.io/badge/Versi%C3%B3n-v7.0-brightgreen?style=flat-square)
 
 > **Desarrollado con dedicación por [C7Dev_](https://github.com/C7Dev-77)** 🎮✨
 
